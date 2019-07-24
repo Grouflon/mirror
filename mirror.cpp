@@ -8,33 +8,20 @@ namespace mirror
 {
 	ClassSet	g_classSet;
 
-	mirror::MemberType GetMemberType(bool&) { return MemberType_bool; }
-	mirror::MemberType GetMemberType(char&) { return MemberType_char; }
-	mirror::MemberType GetMemberType(int8_t&) { return MemberType_int8; }
-	mirror::MemberType GetMemberType(int16_t&) { return MemberType_int16; }
-	mirror::MemberType GetMemberType(int32_t&) { return MemberType_int32; }
-	mirror::MemberType GetMemberType(int64_t&) { return MemberType_int64; }
-	mirror::MemberType GetMemberType(uint8_t&) { return MemberType_uint8; }
-	mirror::MemberType GetMemberType(uint16_t&) { return MemberType_uint16; }
-	mirror::MemberType GetMemberType(uint32_t&) { return MemberType_uint32; }
-	mirror::MemberType GetMemberType(uint64_t&) { return MemberType_uint64; }
-	mirror::MemberType GetMemberType(float&) { return MemberType_float; }
-	mirror::MemberType GetMemberType(double&) { return MemberType_double; }
-	mirror::MemberType GetMemberType(std::string&) { return MemberType_string; }
+	const mirror::Type* GetType(const bool&) { static SimpleType s_type(TypeID_bool); return &s_type; }
+	const mirror::Type* GetType(const char&) { static SimpleType s_type(TypeID_char); return &s_type; }
+	const mirror::Type* GetType(const int8_t&) { static SimpleType s_type(TypeID_int8); return &s_type; }
+	const mirror::Type* GetType(const int16_t&) { static SimpleType s_type(TypeID_int16); return &s_type; }
+	const mirror::Type* GetType(const int32_t&) { static SimpleType s_type(TypeID_int32); return &s_type; }
+	const mirror::Type* GetType(const int64_t&) { static SimpleType s_type(TypeID_int64); return &s_type; }
+	const mirror::Type* GetType(const uint8_t&) { static SimpleType s_type(TypeID_uint8); return &s_type; }
+	const mirror::Type* GetType(const uint16_t&) { static SimpleType s_type(TypeID_uint16); return &s_type; }
+	const mirror::Type* GetType(const uint32_t&) { static SimpleType s_type(TypeID_uint32); return &s_type; }
+	const mirror::Type* GetType(const uint64_t&) { static SimpleType s_type(TypeID_uint64); return &s_type; }
+	const mirror::Type* GetType(const float&) { static SimpleType s_type(TypeID_float); return &s_type; }
+	const mirror::Type* GetType(const double&) { static SimpleType s_type(TypeID_double); return &s_type; }
 
-	mirror::Class* GetClass(bool&) { return nullptr; }
-	mirror::Class* GetClass(char&) { return nullptr; }
-	mirror::Class* GetClass(int8_t&) { return nullptr; }
-	mirror::Class* GetClass(int16_t&) { return nullptr; }
-	mirror::Class* GetClass(int32_t&) { return nullptr; }
-	mirror::Class* GetClass(int64_t&) { return nullptr; }
-	mirror::Class* GetClass(uint8_t&) { return nullptr; }
-	mirror::Class* GetClass(uint16_t&) { return nullptr; }
-	mirror::Class* GetClass(uint32_t&) { return nullptr; }
-	mirror::Class* GetClass(uint64_t&) { return nullptr; }
-	mirror::Class* GetClass(float&) { return nullptr; }
-	mirror::Class* GetClass(double&) { return nullptr; }
-	mirror::Class* GetClass(std::string&) { return nullptr; }
+	const mirror::Type* GetType(const std::string&) { static SimpleType s_type(TypeID_string); return &s_type; }
 
 #define OFFSET_BASIS	2166136261
 #define FNV_PRIME		16777619
@@ -64,19 +51,10 @@ namespace mirror
 		return Hash32(_str, strlen(_str));
 	}
 
-	ClassMember::ClassMember(const char* _name, size_t _offset, MemberType _type)
+	ClassMember::ClassMember(const char* _name, size_t _offset, const Type* _type)
 		: name(_name)
 		, offset(_offset)
 		, type(_type)
-	{
-
-	}
-
-	ClassMember::ClassMember(const char* _name, size_t _offset, MemberType _type, Class* _subClass)
-		: name(_name)
-		, offset(_offset)
-		, type(_type)
-		, subClass(_subClass)
 	{
 
 	}
@@ -143,4 +121,21 @@ namespace mirror
 		assert(it2 != m_classesByTypeHash.end());
 		m_classesByTypeHash.erase(it2);
 	}
+
+	SimpleType::SimpleType(TypeID _typeID)
+		: m_typeID(_typeID)
+	{
+	}
+
+	mirror::TypeID SimpleType::getTypeID() const
+	{
+		return m_typeID;
+	}
+
+	PointerType::PointerType(const Type* _subType)
+		: m_subType(_subType)
+	{
+		
+	}
+
 }

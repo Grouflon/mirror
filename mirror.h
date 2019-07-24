@@ -9,7 +9,7 @@
 
 #define MIRROR(_class)\
 public:\
-	static mirror::Class* GetClass()\
+	static const mirror::Class* GetClass()\
 	{\
 		mirror::Class* mClass = mirror::g_classSet.getClassByTypeHash(typeid(_class).hash_code());\
 		if (!mClass)\
@@ -29,91 +29,82 @@ public:\
 #define M_MEMBER(_memberName)\
 	{\
 		size_t offset = reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(&prototypePtr);\
-		mirror::MemberType type = mirror::GetMemberType(prototypePtr->_memberName);\
-		if (type == mirror::MemberType_ClassInstance)\
-		{\
-			mClass->addMember(mirror::ClassMember(#_memberName, offset, type, mirror::GetClass(prototypePtr->_memberName)));\
-		}\
-		else\
-		{\
-			mClass->addMember(mirror::ClassMember(#_memberName, offset, type));\
-		}\
+		const mirror::Type* type = mirror::GetType(prototypePtr->_memberName);\
+		mClass->addMember(mirror::ClassMember(#_memberName, offset, type));\
 	}
 
 namespace mirror
 {
-	class Class;
-
-	enum MemberType
+	enum TypeID
 	{
-		MemberType_none,
+		TypeID_none,
 
-		MemberType_bool,
-		MemberType_char,
+		TypeID_bool,
+		TypeID_char,
 
-		MemberType_int8,
-		MemberType_int16,
-		MemberType_int32,
-		MemberType_int64,
+		TypeID_int8,
+		TypeID_int16,
+		TypeID_int32,
+		TypeID_int64,
 
-		MemberType_uint8,
-		MemberType_uint16,
-		MemberType_uint32,
-		MemberType_uint64,
+		TypeID_uint8,
+		TypeID_uint16,
+		TypeID_uint32,
+		TypeID_uint64,
 
-		MemberType_float,
-		MemberType_double,
+		TypeID_float,
+		TypeID_double,
 
-		MemberType_string,
+		TypeID_string,
 
-		MemberType_fixedCArray,
-		MemberType_dynamicCArray,
+		TypeID_fixedCArray,
+		TypeID_dynamicCArray,
 
-		MemberType_ClassInstance,
+		TypeID_Class,
+
+		TypeID_Pointer,
 	};
-	template <typename T> MemberType GetMemberType(T&);
-	MemberType GetMemberType(bool&);
-	MemberType GetMemberType(char&);
-	MemberType GetMemberType(int8_t&);
-	MemberType GetMemberType(int16_t&);
-	MemberType GetMemberType(int32_t&);
-	MemberType GetMemberType(int64_t&);
-	MemberType GetMemberType(uint8_t&);
-	MemberType GetMemberType(uint16_t&);
-	MemberType GetMemberType(uint32_t&);
-	MemberType GetMemberType(uint64_t&);
-	MemberType GetMemberType(float&);
-	MemberType GetMemberType(double&);
-	MemberType GetMemberType(std::string&);
 
-	template<typename T> Class* GetClass(T&);
-	Class* GetClass(bool&);
-	Class* GetClass(char&);
-	Class* GetClass(int8_t&);
-	Class* GetClass(int16_t&);
-	Class* GetClass(int32_t&);
-	Class* GetClass(int64_t&);
-	Class* GetClass(uint8_t&);
-	Class* GetClass(uint16_t&);
-	Class* GetClass(uint32_t&);
-	Class* GetClass(uint64_t&);
-	Class* GetClass(float&);
-	Class* GetClass(double&);
-	Class* GetClass(std::string&);
+	class Type
+	{
+	public:
+		virtual TypeID getTypeID() const = 0;
+	};
+
+	class SimpleType : public Type
+	{
+	public:
+		SimpleType(TypeID _typeID);
+
+		virtual TypeID getTypeID() const override;
+
+	private:
+		TypeID m_typeID = TypeID_none;
+	};
+
+	class PointerType : public Type
+	{
+	public:
+		PointerType(const Type* _subType);
+
+		virtual TypeID getTypeID() const override { return TypeID_Pointer; }
+		const Type* getSubType() const { return m_subType; }
+
+	private:
+		const Type* m_subType;
+	};
 
 	struct ClassMember
 	{
-		ClassMember(const char* _name, size_t _offset, MemberType _type);
-		ClassMember(const char* _name, size_t _offset, MemberType _type, Class* _subClass);
+		ClassMember(const char* _name, size_t _offset, const Type* _type);
 
 		const char* name;
 		size_t offset;
-		MemberType type;
-		Class* subClass = nullptr;
+		const Type* type;
 	};
 
 
-	class Class
+	class Class : public Type
 	{
 	public:
 		Class(const char* _name, size_t _typeHash);
@@ -123,6 +114,8 @@ namespace mirror
 		inline size_t getTypeHash() const { return m_typeHash; }
 
 		void addMember(const ClassMember& _member);
+
+		virtual TypeID getTypeID() const override { return TypeID_Class; }
 
 	private:
 		std::vector<ClassMember> m_members;
@@ -148,23 +141,34 @@ namespace mirror
 	};
 	extern ClassSet	g_classSet;
 
+	//template<typename T> const Type* GetType(const T*);
+	template <typename T> const Type* GetType(T _v);
+	const Type* GetType(const bool&);
+	const Type* GetType(const char&);
+	const Type* GetType(const int8_t&);
+	const Type* GetType(const int16_t&);
+	const Type* GetType(const int32_t&);
+	const Type* GetType(const int64_t&);
+	const Type* GetType(const uint8_t&);
+	const Type* GetType(const uint16_t&);
+	const Type* GetType(const uint32_t&);
+	const Type* GetType(const uint64_t&);
+	const Type* GetType(const float&);
+	const Type* GetType(const double&);
+	const Type* GetType(const std::string&);
 
 	uint32_t Hash32(const void* _data, size_t _size);
 	uint32_t HashCString(const char* _str);
 }
 
 // INL
-template <typename T> mirror::MemberType mirror::GetMemberType(T&)
-{
-	if (T::GetClass())
-	{
-		return MemberType_ClassInstance;
-	}
-	return MemberType_none;
-}
 
-template <typename T> mirror::Class* mirror::GetClass(T&)
+/*template <typename T> const mirror::Type* mirror::GetType(const T* _v)
+{
+	return new PointerType(GetType(*_v));
+}*/
+
+template <typename T> const mirror::Type* mirror::GetType(T _v)
 {
 	return T::GetClass();
 }
-
