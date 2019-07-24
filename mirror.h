@@ -141,8 +141,14 @@ namespace mirror
 	};
 	extern ClassSet	g_classSet;
 
-	//template<typename T> const Type* GetType(const T*);
-	template <typename T> const Type* GetType(T _v);
+	template <typename T> const Type* GetType(T _v)
+	{
+		return T::GetClass();
+	}
+	template <typename T> const Type* GetType(T* _v)
+	{
+		return new PointerType(GetType(T()));
+	}
 	const Type* GetType(const bool&);
 	const Type* GetType(const char&);
 	const Type* GetType(const int8_t&);
@@ -162,13 +168,3 @@ namespace mirror
 }
 
 // INL
-
-/*template <typename T> const mirror::Type* mirror::GetType(const T* _v)
-{
-	return new PointerType(GetType(*_v));
-}*/
-
-template <typename T> const mirror::Type* mirror::GetType(T _v)
-{
-	return T::GetClass();
-}
