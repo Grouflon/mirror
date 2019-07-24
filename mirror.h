@@ -4,6 +4,29 @@
 #include <unordered_map>
 #include <vector>
 #include <string.h>
+#include <type_traits>
+
+#define MIRROR(_class)\
+public:\
+	static mirror::Class* GetClass()\
+	{\
+		mirror::Class* mClass = mirror::g_classSet.getClass(#_class);\
+		if (!mClass)\
+		{\
+			mClass = new mirror::Class(#_class);\
+			char fakePrototype[sizeof(_class)];\
+			_class* prototypePtr = (_class*) fakePrototype;\
+			_MIRROR_CONTENT
+
+#define _MIRROR_CONTENT(...)\
+			__VA_ARGS__\
+			mirror::g_classSet.addClass(mClass); \
+		}\
+		return mClass; \
+	}
+
+#define M_MEMBER(_memberName)\
+	mClass->addMember(#_memberName, reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(&prototypePtr), mirror::getMemberType(&(prototypePtr->_memberName)));
 
 namespace mirror
 {
@@ -60,7 +83,6 @@ namespace mirror
 		inline const char* getName() const { return m_name; }
 
 		void addMember(const char* _name, size_t _address, MemberType _type);
-		template <typename T> void addMember(const char* _name, size_t _address, T* _value);
 
 	private:
 		std::vector<ClassMember> m_members;
@@ -90,9 +112,3 @@ namespace mirror
 
 // INL
 template <typename T> mirror::MemberType mirror::getMemberType(T*) { static_assert(false, "unsupported type"); return 0; }
-
-template <typename T>
-void mirror::Class::addMember(const char* _name, size_t _address, T* _value)
-{
-	addMember(_name, _address, getType(_value));
-}
