@@ -6,12 +6,13 @@
 #include <string.h>
 #include <type_traits>
 #include <typeinfo>
+#include <typeinfo>
 
-#define MIRROR(_class)\
+#define MIRROR_CLASS(_class)\
 public:\
 	static const mirror::Class* GetClass()\
 	{\
-		mirror::Class* mClass = mirror::g_classSet.getClassByTypeHash(typeid(_class).hash_code());\
+		mirror::Class* mClass = mirror::g_classSet.findClassByTypeHash(typeid(_class).hash_code());\
 		if (!mClass)\
 		{\
 			mClass = new mirror::Class(#_class, typeid(_class).hash_code());\
@@ -26,85 +27,95 @@ public:\
 		return mClass;\
 	}
 
-#define M_MEMBER(_memberName)\
+#define MIRROR_MEMBER(_memberName)\
 	{\
-		size_t offset = reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(&prototypePtr);\
-		const mirror::Type* type = mirror::GetType(prototypePtr->_memberName);\
+		size_t offset = reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(prototypePtr);\
+		const mirror::TypeDesc* type = mirror::GetTypeDesc(prototypePtr->_memberName);\
 		mClass->addMember(mirror::ClassMember(#_memberName, offset, type));\
 	}
 
+#define MIRROR_MEMBER_CSTRING()
+#define MIRROR_MEMBER_CFIXEDARRAY()
+#define MIRROR_MEMBER_CDYNAMICARRAY()
+
 namespace mirror
 {
-	enum TypeID
+	class Class;
+	class TypeDesc;
+
+	enum Type
 	{
-		TypeID_none,
+		Type_none,
 
-		TypeID_bool,
-		TypeID_char,
+		Type_SimpleType_bool,
+		Type_SimpleType_char,
 
-		TypeID_int8,
-		TypeID_int16,
-		TypeID_int32,
-		TypeID_int64,
+		Type_SimpleType_int8,
+		Type_SimpleType_int16,
+		Type_SimpleType_int32,
+		Type_SimpleType_int64,
 
-		TypeID_uint8,
-		TypeID_uint16,
-		TypeID_uint32,
-		TypeID_uint64,
+		Type_SimpleType_uint8,
+		Type_SimpleType_uint16,
+		Type_SimpleType_uint32,
+		Type_SimpleType_uint64,
 
-		TypeID_float,
-		TypeID_double,
+		Type_SimpleType_float,
+		Type_SimpleType_double,
 
-		TypeID_string,
+		Type_SimpleType_std_string,
 
-		TypeID_fixedCArray,
-		TypeID_dynamicCArray,
+		Type_c_string,
+		Type_c_fixedArray,
+		Type_c_dynamicArray,
 
-		TypeID_Class,
+		Type_Class,
 
-		TypeID_Pointer,
+		Type_Pointer,
 	};
 
-	class Type
+	class TypeDesc
 	{
 	public:
-		virtual TypeID getTypeID() const = 0;
+		virtual Type getType() const = 0;
 	};
 
-	class SimpleType : public Type
+	class SimpleTypeDesc : public TypeDesc
 	{
 	public:
-		SimpleType(TypeID _typeID);
+		SimpleTypeDesc(Type _typeID);
 
-		virtual TypeID getTypeID() const override;
+		virtual Type getType() const override;
 
 	private:
-		TypeID m_typeID = TypeID_none;
+		Type m_typeID = Type_none;
 	};
 
-	class PointerType : public Type
+	class PointerTypeDesc : public TypeDesc
 	{
 	public:
-		PointerType(const Type* _subType);
+		PointerTypeDesc(const TypeDesc* _subType);
 
-		virtual TypeID getTypeID() const override { return TypeID_Pointer; }
-		const Type* getSubType() const { return m_subType; }
+		virtual Type getType() const override { return Type_Pointer; }
+		const TypeDesc* getSubType() const { return m_subType; }
 
 	private:
-		const Type* m_subType;
+		const TypeDesc* m_subType;
 	};
 
 	struct ClassMember
 	{
-		ClassMember(const char* _name, size_t _offset, const Type* _type);
+		ClassMember(const char* _name, size_t _offset, const TypeDesc* _type);
+
+		void* getInstanceMemberPointer(void* _classInstancePointer) const;
 
 		const char* name;
 		size_t offset;
-		const Type* type;
+		const TypeDesc* type;
 	};
 
 
-	class Class : public Type
+	class Class : public TypeDesc
 	{
 	public:
 		Class(const char* _name, size_t _typeHash);
@@ -115,7 +126,7 @@ namespace mirror
 
 		void addMember(const ClassMember& _member);
 
-		virtual TypeID getTypeID() const override { return TypeID_Class; }
+		virtual Type getType() const override { return Type_Class; }
 
 	private:
 		std::vector<ClassMember> m_members;
@@ -123,14 +134,14 @@ namespace mirror
 		const char* m_name;
 	};
 
-
+	
 	class ClassSet
 	{
 	public:
 		~ClassSet();
 
-		Class* getClassByName(const char* _className);
-		Class* getClassByTypeHash(size_t _classTypeHash);
+		Class* findClassByName(const char* _className);
+		Class* findClassByTypeHash(size_t _classTypeHash);
 
 		void addClass(Class* _class);
 		void removeClass(Class* _class);
@@ -141,27 +152,27 @@ namespace mirror
 	};
 	extern ClassSet	g_classSet;
 
-	template <typename T> const Type* GetType(T _v)
+	template <typename T> const TypeDesc* GetTypeDesc(T _v)
 	{
 		return T::GetClass();
 	}
-	template <typename T> const Type* GetType(T* _v)
+	template <typename T> const TypeDesc* GetTypeDesc(T* _v)
 	{
-		return new PointerType(GetType(T()));
+		return new PointerTypeDesc(GetTypeDesc(T()));
 	}
-	const Type* GetType(const bool&);
-	const Type* GetType(const char&);
-	const Type* GetType(const int8_t&);
-	const Type* GetType(const int16_t&);
-	const Type* GetType(const int32_t&);
-	const Type* GetType(const int64_t&);
-	const Type* GetType(const uint8_t&);
-	const Type* GetType(const uint16_t&);
-	const Type* GetType(const uint32_t&);
-	const Type* GetType(const uint64_t&);
-	const Type* GetType(const float&);
-	const Type* GetType(const double&);
-	const Type* GetType(const std::string&);
+	const TypeDesc* GetTypeDesc(const bool&);
+	const TypeDesc* GetTypeDesc(const char&);
+	const TypeDesc* GetTypeDesc(const int8_t&);
+	const TypeDesc* GetTypeDesc(const int16_t&);
+	const TypeDesc* GetTypeDesc(const int32_t&);
+	const TypeDesc* GetTypeDesc(const int64_t&);
+	const TypeDesc* GetTypeDesc(const uint8_t&);
+	const TypeDesc* GetTypeDesc(const uint16_t&);
+	const TypeDesc* GetTypeDesc(const uint32_t&);
+	const TypeDesc* GetTypeDesc(const uint64_t&);
+	const TypeDesc* GetTypeDesc(const float&);
+	const TypeDesc* GetTypeDesc(const double&);
+	const TypeDesc* GetTypeDesc(const std::string&);
 
 	uint32_t Hash32(const void* _data, size_t _size);
 	uint32_t HashCString(const char* _str);

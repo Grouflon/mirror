@@ -8,20 +8,19 @@ namespace mirror
 {
 	ClassSet	g_classSet;
 
-	const mirror::Type* GetType(const bool&) { static SimpleType s_type(TypeID_bool); return &s_type; }
-	const mirror::Type* GetType(const char&) { static SimpleType s_type(TypeID_char); return &s_type; }
-	const mirror::Type* GetType(const int8_t&) { static SimpleType s_type(TypeID_int8); return &s_type; }
-	const mirror::Type* GetType(const int16_t&) { static SimpleType s_type(TypeID_int16); return &s_type; }
-	const mirror::Type* GetType(const int32_t&) { static SimpleType s_type(TypeID_int32); return &s_type; }
-	const mirror::Type* GetType(const int64_t&) { static SimpleType s_type(TypeID_int64); return &s_type; }
-	const mirror::Type* GetType(const uint8_t&) { static SimpleType s_type(TypeID_uint8); return &s_type; }
-	const mirror::Type* GetType(const uint16_t&) { static SimpleType s_type(TypeID_uint16); return &s_type; }
-	const mirror::Type* GetType(const uint32_t&) { static SimpleType s_type(TypeID_uint32); return &s_type; }
-	const mirror::Type* GetType(const uint64_t&) { static SimpleType s_type(TypeID_uint64); return &s_type; }
-	const mirror::Type* GetType(const float&) { static SimpleType s_type(TypeID_float); return &s_type; }
-	const mirror::Type* GetType(const double&) { static SimpleType s_type(TypeID_double); return &s_type; }
-
-	const mirror::Type* GetType(const std::string&) { static SimpleType s_type(TypeID_string); return &s_type; }
+	const mirror::TypeDesc* GetTypeDesc(const bool&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_bool); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const char&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_char); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const int8_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_int8); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const int16_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_int16); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const int32_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_int32); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const int64_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_int64); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const uint8_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_uint8); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const uint16_t&)		{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_uint16); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const uint32_t&)		{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_uint32); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const uint64_t&)		{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_uint64); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const float&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_float); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const double&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_double); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const std::string&)		{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_std_string); return &s_typeDesc; }
 
 #define OFFSET_BASIS	2166136261
 #define FNV_PRIME		16777619
@@ -51,12 +50,17 @@ namespace mirror
 		return Hash32(_str, strlen(_str));
 	}
 
-	ClassMember::ClassMember(const char* _name, size_t _offset, const Type* _type)
+	ClassMember::ClassMember(const char* _name, size_t _offset, const TypeDesc* _type)
 		: name(_name)
 		, offset(_offset)
 		, type(_type)
 	{
 
+	}
+
+	void* ClassMember::getInstanceMemberPointer(void* _classInstancePointer) const
+	{
+		return reinterpret_cast<uint8_t*>(_classInstancePointer) + offset;
 	}
 
 	Class::Class(const char* _name, size_t _typeHash)
@@ -84,13 +88,13 @@ namespace mirror
 		m_classesByTypeHash.clear();
 	}
 
-	mirror::Class* ClassSet::getClassByName(const char* _className)
+	mirror::Class* ClassSet::findClassByName(const char* _className)
 	{
 		auto it = m_classesByNameHash.find(HashCString(_className));
 		return it != m_classesByNameHash.end() ? it->second : nullptr;
 	}
 
-	Class* ClassSet::getClassByTypeHash(size_t _classTypeHash)
+	Class* ClassSet::findClassByTypeHash(size_t _classTypeHash)
 	{
 		auto it = m_classesByTypeHash.find(_classTypeHash);
 		return it != m_classesByTypeHash.end() ? it->second : nullptr;
@@ -122,17 +126,17 @@ namespace mirror
 		m_classesByTypeHash.erase(it2);
 	}
 
-	SimpleType::SimpleType(TypeID _typeID)
+	SimpleTypeDesc::SimpleTypeDesc(Type _typeID)
 		: m_typeID(_typeID)
 	{
 	}
 
-	mirror::TypeID SimpleType::getTypeID() const
+	mirror::Type SimpleTypeDesc::getType() const
 	{
 		return m_typeID;
 	}
 
-	PointerType::PointerType(const Type* _subType)
+	PointerTypeDesc::PointerTypeDesc(const TypeDesc* _subType)
 		: m_subType(_subType)
 	{
 		
