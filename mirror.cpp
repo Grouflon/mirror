@@ -127,13 +127,13 @@ namespace mirror
 	}
 
 	SimpleTypeDesc::SimpleTypeDesc(Type _typeID)
-		: m_typeID(_typeID)
+		: m_type(_typeID)
 	{
 	}
 
 	mirror::Type SimpleTypeDesc::getType() const
 	{
-		return m_typeID;
+		return m_type;
 	}
 
 	PointerTypeDesc::PointerTypeDesc(const TypeDesc* _subType)
@@ -143,3 +143,4 @@ namespace mirror
 	}
 
 }
+

@@ -3,10 +3,13 @@
 #include <cassert>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace mirror
 {
 	class Class;
+	class TypeDesc;
+	class StdVectorTypeDescBase;
 
 	class BinarySerializer
 	{
@@ -26,7 +29,7 @@ namespace mirror
 			serialize(_object, T::GetClass());
 		}
 
-		void serialize(void* _object, const Class* _class);
+		void serialize(void* _object, const TypeDesc* _typeDesc);
 		void serialize(bool* _object);
 		void serialize(char* _object);
 		void serialize(uint8_t* _object);
@@ -40,6 +43,7 @@ namespace mirror
 		void serialize(float* _object);
 		void serialize(double* _object);
 		void serialize(std::string* _object);
+		void serialize(void* _object, const StdVectorTypeDescBase* _typeDesc);
 	private:
 
 		void _reserve(size_t _size);

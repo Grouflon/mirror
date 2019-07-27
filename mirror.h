@@ -64,6 +64,7 @@ namespace mirror
 		Type_SimpleType_double,
 
 		Type_SimpleType_std_string,
+		Type_std_vector,
 
 		Type_c_string,
 		Type_c_fixedArray,
@@ -88,7 +89,30 @@ namespace mirror
 		virtual Type getType() const override;
 
 	private:
-		Type m_typeID = Type_none;
+		Type m_type = Type_none;
+	};
+
+	class StdVectorTypeDescBase : public TypeDesc
+	{
+	public:
+		virtual void instanceResize(void* _instance, size_t _size) const = 0;
+		virtual size_t instanceSize(void* _instance) const = 0;
+		virtual void* instanceGetDataPointerAt(void* _instance, size_t _index) const = 0;
+		virtual Type getType() const override { return Type_std_vector; }
+		const TypeDesc* getSubType() const { return m_subType; }
+
+	protected:
+		const TypeDesc* m_subType;
+	};
+	template <typename T>
+	class StdVectorTypeDesc : public StdVectorTypeDescBase
+	{
+	public:
+		StdVectorTypeDesc();
+
+		virtual void instanceResize(void* _instance, size_t _size) const override;
+		virtual size_t instanceSize(void* _instance) const override;
+		virtual void* instanceGetDataPointerAt(void* _instance, size_t _index) const override;
 	};
 
 	class PointerTypeDesc : public TypeDesc
@@ -152,13 +176,17 @@ namespace mirror
 	};
 	extern ClassSet	g_classSet;
 
-	template <typename T> const TypeDesc* GetTypeDesc(T _v)
+	template <typename T> const TypeDesc* GetTypeDesc(const T& _v)
 	{
 		return T::GetClass();
 	}
 	template <typename T> const TypeDesc* GetTypeDesc(T* _v)
 	{
 		return new PointerTypeDesc(GetTypeDesc(T()));
+	}
+	template <typename T> const TypeDesc* GetTypeDesc(const std::vector<T>& _v)
+	{
+		return new StdVectorTypeDesc<T>();
 	}
 	const TypeDesc* GetTypeDesc(const bool&);
 	const TypeDesc* GetTypeDesc(const char&);
@@ -179,3 +207,28 @@ namespace mirror
 }
 
 // INL
+
+
+template <typename T>
+mirror::StdVectorTypeDesc<T>::StdVectorTypeDesc()
+{
+	m_subType = GetTypeDesc(T());
+}
+
+template <typename T>
+void* mirror::StdVectorTypeDesc<T>::instanceGetDataPointerAt(void* _instance, size_t _index) const
+{
+	return reinterpret_cast<std::vector<T>*>(_instance)->data() + _index;
+}
+
+template <typename T>
+size_t mirror::StdVectorTypeDesc<T>::instanceSize(void* _instance) const
+{
+	return reinterpret_cast<std::vector<T>*>(_instance)->size();
+}
+
+template <typename T>
+void mirror::StdVectorTypeDesc<T>::instanceResize(void* _instance, size_t _size) const
+{
+	reinterpret_cast<std::vector<T>*>(_instance)->resize(_size);
+}

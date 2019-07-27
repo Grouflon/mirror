@@ -62,61 +62,66 @@ namespace mirror
 		m_isReading = false;
 	}
 
-	void BinarySerializer::serialize(void* _object, const Class* _class)
+	void BinarySerializer::serialize(void* _object, const TypeDesc* _typeDesc)
 	{
 		assert(_object);
-		assert(_class);
+		assert(_typeDesc);
 
-		for (const ClassMember& member : _class->getMembers())
+		switch (_typeDesc->getType())
 		{
-			void* instanceMemberPointer = member.getInstanceMemberPointer(_object);
-			switch (member.type->getType())
+		case Type_SimpleType_bool:
+			serialize(reinterpret_cast<bool*>(_object));
+			break;
+		case Type_SimpleType_char:
+			serialize(reinterpret_cast<char*>(_object));
+			break;
+		case Type_SimpleType_uint8:
+			serialize(reinterpret_cast<uint8_t*>(_object));
+			break;
+		case Type_SimpleType_uint16:
+			serialize(reinterpret_cast<uint16_t*>(_object));
+			break;
+		case Type_SimpleType_uint32:
+			serialize(reinterpret_cast<uint32_t*>(_object));
+			break;
+		case Type_SimpleType_uint64:
+			serialize(reinterpret_cast<uint64_t*>(_object));
+			break;
+		case Type_SimpleType_int8:
+			serialize(reinterpret_cast<int8_t*>(_object));
+			break;
+		case Type_SimpleType_int16:
+			serialize(reinterpret_cast<int16_t*>(_object));
+			break;
+		case Type_SimpleType_int32:
+			serialize(reinterpret_cast<int32_t*>(_object));
+			break;
+		case Type_SimpleType_int64:
+			serialize(reinterpret_cast<int64_t*>(_object));
+			break;
+		case Type_SimpleType_float:
+			serialize(reinterpret_cast<float*>(_object));
+			break;
+		case Type_SimpleType_double:
+			serialize(reinterpret_cast<double*>(_object));
+			break;
+		case Type_SimpleType_std_string:
+			serialize(reinterpret_cast<std::string*>(_object));
+			break;
+		case Type_std_vector:
+			serialize(_object, static_cast<const StdVectorTypeDescBase*>(_typeDesc));
+			break;
+		case Type_Class:
+		{
+			const Class* clss = static_cast<const Class*>(_typeDesc);
+			for (const ClassMember& member : clss->getMembers())
 			{
-			case Type_SimpleType_bool:
-				serialize(reinterpret_cast<bool*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_char:
-				serialize(reinterpret_cast<char*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_uint8:
-				serialize(reinterpret_cast<uint8_t*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_uint16:
-				serialize(reinterpret_cast<uint16_t*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_uint32:
-				serialize(reinterpret_cast<uint32_t*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_uint64:
-				serialize(reinterpret_cast<uint64_t*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_int8:
-				serialize(reinterpret_cast<int8_t*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_int16:
-				serialize(reinterpret_cast<int16_t*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_int32:
-				serialize(reinterpret_cast<int32_t*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_int64:
-				serialize(reinterpret_cast<int64_t*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_float:
-				serialize(reinterpret_cast<float*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_double:
-				serialize(reinterpret_cast<double*>(instanceMemberPointer));
-				break;
-			case Type_SimpleType_std_string:
-				serialize(reinterpret_cast<std::string*>(instanceMemberPointer));
-				break;
-			case Type_Class:
-				serialize(instanceMemberPointer, static_cast<const Class*>(member.type));
-				break;
-			default:
-				break;
+				serialize(member.getInstanceMemberPointer(_object), member.type);
 			}
+		}
+		break;
+		default:
+			break;
 		}
 	}
 
@@ -220,6 +225,28 @@ namespace mirror
 			m_readCursor += _object->length() + 1;
 		}
 		else assert(false);
+	}
+
+	void BinarySerializer::serialize(void* _object, const StdVectorTypeDescBase* _typeDesc)
+	{
+		assert(_object);
+		size_t size;
+		if (m_isWriting)
+		{
+			size = _typeDesc->instanceSize(_object);
+			serialize(&size);
+		}
+		else if (m_isReading)
+		{
+			serialize(&size);
+			_typeDesc->instanceResize(_object, size);
+		}
+		else assert(false);
+
+		for (size_t i = 0; i < size; ++i)
+		{
+			serialize(_typeDesc->instanceGetDataPointerAt(_object, i), _typeDesc->getSubType());
+		}
 	}
 
 	void BinarySerializer::_reserve(size_t _size)
