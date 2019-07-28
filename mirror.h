@@ -110,6 +110,8 @@ namespace mirror
 	public:
 		StdVectorTypeDesc();
 
+		// This class is used as a proxy to access vector's methods without knowing its type.
+		// More methods can be added if needed
 		virtual void instanceResize(void* _instance, size_t _size) const override;
 		virtual size_t instanceSize(void* _instance) const override;
 		virtual void* instanceGetDataPointerAt(void* _instance, size_t _index) const override;
