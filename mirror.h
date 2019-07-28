@@ -18,7 +18,7 @@ public:\
 			mClass = new mirror::Class(#_class, typeid(_class).hash_code());\
 			mirror::g_classSet.addClass(mClass);\
 			char fakePrototype[sizeof(_class)];\
-			_class* prototypePtr = (_class*) fakePrototype;\
+			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
 			_MIRROR_CONTENT
 
 #define _MIRROR_CONTENT(...)\
@@ -178,9 +178,22 @@ namespace mirror
 	};
 	extern ClassSet	g_classSet;
 
-	template <typename T> const TypeDesc* GetTypeDesc(const T& _v)
+	template <typename T, std::enable_if_t<!std::is_enum<T>{}>* = nullptr >
+	const TypeDesc* GetTypeDesc(const T& _v)
 	{
 		return T::GetClass();
+	}
+	template <typename T, std::enable_if_t<std::is_enum<T>{}>* = nullptr >
+	const TypeDesc* GetTypeDesc(const T& _v)
+	{
+		switch (sizeof(T))
+		{
+		case 1: return GetTypeDesc(int8_t());
+		case 2: return GetTypeDesc(int16_t());
+		case 4: return GetTypeDesc(int32_t());
+		case 8: return GetTypeDesc(int64_t());
+		}
+		return nullptr;
 	}
 	template <typename T> const TypeDesc* GetTypeDesc(T* _v)
 	{
