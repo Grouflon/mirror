@@ -311,5 +311,4 @@ namespace mirror
 			data = reinterpret_cast<uint8_t*>(realloc(data, dataAllocatedSize));
 		}
 	}
-
 }

@@ -100,4 +100,56 @@ namespace mirror
 		bool m_isWriting = false;
 		bool m_isReading = false;
 	};
+
+
+	static BinarySerializer s_staticSerializer;
+
+	template <typename T>
+	static bool SaveToFile(T& _data, const char* _fileName)
+	{
+		s_staticSerializer.beginWrite();
+		s_staticSerializer.serialize("", _data);
+		s_staticSerializer.endWrite();
+
+		const void* data = nullptr;
+		size_t dataSize = 0u;
+		s_staticSerializer.getWriteData(data, dataSize);
+
+		FILE* fp = fopen(_fileName, "w");
+		if (!fp)
+			return false;
+
+		fwrite(data, dataSize, 1, fp);
+		fclose(fp);
+
+		return true;
+	}
+
+	template <typename T>
+	static bool LoadFromFile(T& _data, const char* _fileName)
+	{
+		size_t dataSize = 0u;
+		void* data = nullptr;
+
+		FILE* fp = fopen(_fileName, "r");
+		if (!fp)
+			return false;
+
+		fseek(fp, 0, SEEK_END);
+		dataSize = ftell(fp);
+		fseek(fp, 0, SEEK_SET);
+
+		data = malloc(dataSize);
+
+		fread(data, dataSize, 1, fp);
+		fclose(fp);
+
+		s_staticSerializer.beginRead(data, dataSize);
+		s_staticSerializer.serialize("", _data);
+		s_staticSerializer.endRead();
+
+		free(data);
+
+		return true;
+	}
 }
