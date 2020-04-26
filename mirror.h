@@ -6,7 +6,9 @@
 #include <string.h>
 #include <type_traits>
 #include <typeinfo>
-#include <typeinfo>
+
+#include <mirror_types.h>
+#include <mirror_std.h>
 
 #define MIRROR_CLASS(_class)\
 public:\
@@ -34,87 +36,24 @@ public:\
 		mClass->addMember(mirror::ClassMember(#_memberName, offset, type));\
 	}
 
-#define MIRROR_MEMBER_CSTRING()
+/*#define MIRROR_MEMBER_CSTRING()
 #define MIRROR_MEMBER_CFIXEDARRAY()
-#define MIRROR_MEMBER_CDYNAMICARRAY()
+#define MIRROR_MEMBER_CDYNAMICARRAY()*/
 
 namespace mirror
 {
 	class Class;
 	class TypeDesc;
 
-	enum Type
-	{
-		Type_none,
-
-		Type_SimpleType_bool,
-		Type_SimpleType_char,
-
-		Type_SimpleType_int8,
-		Type_SimpleType_int16,
-		Type_SimpleType_int32,
-		Type_SimpleType_int64,
-
-		Type_SimpleType_uint8,
-		Type_SimpleType_uint16,
-		Type_SimpleType_uint32,
-		Type_SimpleType_uint64,
-
-		Type_SimpleType_float,
-		Type_SimpleType_double,
-
-		Type_SimpleType_std_string,
-		Type_std_vector,
-
-		Type_c_string,
-		Type_c_fixedArray,
-		Type_c_dynamicArray,
-
-		Type_Class,
-
-		Type_Pointer,
-	};
-
 	class TypeDesc
 	{
 	public:
-		virtual Type getType() const = 0;
-	};
+		TypeDesc(Type _type) : m_type(_type) {}
 
-	class SimpleTypeDesc : public TypeDesc
-	{
-	public:
-		SimpleTypeDesc(Type _typeID);
-
-		virtual Type getType() const override;
+		Type getType() const { return m_type; }
 
 	private:
 		Type m_type = Type_none;
-	};
-
-	class StdVectorTypeDescBase : public TypeDesc
-	{
-	public:
-		virtual void instanceResize(void* _instance, size_t _size) const = 0;
-		virtual size_t instanceSize(void* _instance) const = 0;
-		virtual void* instanceGetDataPointerAt(void* _instance, size_t _index) const = 0;
-		virtual Type getType() const override { return Type_std_vector; }
-		const TypeDesc* getSubType() const { return m_subType; }
-
-	protected:
-		const TypeDesc* m_subType;
-	};
-	template <typename T>
-	class StdVectorTypeDesc : public StdVectorTypeDescBase
-	{
-	public:
-		StdVectorTypeDesc();
-
-		// This class is used as a proxy to access vector's methods without knowing its type.
-		// More methods can be added if needed
-		virtual void instanceResize(void* _instance, size_t _size) const override;
-		virtual size_t instanceSize(void* _instance) const override;
-		virtual void* instanceGetDataPointerAt(void* _instance, size_t _index) const override;
 	};
 
 	class PointerTypeDesc : public TypeDesc
@@ -122,7 +61,6 @@ namespace mirror
 	public:
 		PointerTypeDesc(const TypeDesc* _subType);
 
-		virtual Type getType() const override { return Type_Pointer; }
 		const TypeDesc* getSubType() const { return m_subType; }
 
 	private:
@@ -151,8 +89,6 @@ namespace mirror
 		inline size_t getTypeHash() const { return m_typeHash; }
 
 		void addMember(const ClassMember& _member);
-
-		virtual Type getType() const override { return Type_Class; }
 
 	private:
 		std::vector<ClassMember> m_members;
@@ -199,10 +135,7 @@ namespace mirror
 	{
 		return new PointerTypeDesc(GetTypeDesc(T()));
 	}
-	template <typename T> const TypeDesc* GetTypeDesc(const std::vector<T>& _v)
-	{
-		return new StdVectorTypeDesc<T>();
-	}
+
 	const TypeDesc* GetTypeDesc(const bool&);
 	const TypeDesc* GetTypeDesc(const char&);
 	const TypeDesc* GetTypeDesc(const int8_t&);
@@ -215,35 +148,7 @@ namespace mirror
 	const TypeDesc* GetTypeDesc(const uint64_t&);
 	const TypeDesc* GetTypeDesc(const float&);
 	const TypeDesc* GetTypeDesc(const double&);
-	const TypeDesc* GetTypeDesc(const std::string&);
 
 	uint32_t Hash32(const void* _data, size_t _size);
 	uint32_t HashCString(const char* _str);
-}
-
-// INL
-
-
-template <typename T>
-mirror::StdVectorTypeDesc<T>::StdVectorTypeDesc()
-{
-	m_subType = GetTypeDesc(T());
-}
-
-template <typename T>
-void* mirror::StdVectorTypeDesc<T>::instanceGetDataPointerAt(void* _instance, size_t _index) const
-{
-	return reinterpret_cast<std::vector<T>*>(_instance)->data() + _index;
-}
-
-template <typename T>
-size_t mirror::StdVectorTypeDesc<T>::instanceSize(void* _instance) const
-{
-	return reinterpret_cast<std::vector<T>*>(_instance)->size();
-}
-
-template <typename T>
-void mirror::StdVectorTypeDesc<T>::instanceResize(void* _instance, size_t _size) const
-{
-	reinterpret_cast<std::vector<T>*>(_instance)->resize(_size);
 }

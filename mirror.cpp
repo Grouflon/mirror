@@ -8,19 +8,18 @@ namespace mirror
 {
 	ClassSet	g_classSet;
 
-	const mirror::TypeDesc* GetTypeDesc(const bool&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_bool); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const char&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_char); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const int8_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_int8); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const int16_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_int16); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const int32_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_int32); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const int64_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_int64); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const uint8_t&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_uint8); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const uint16_t&)		{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_uint16); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const uint32_t&)		{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_uint32); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const uint64_t&)		{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_uint64); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const float&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_float); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const double&)			{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_double); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const std::string&)		{ static SimpleTypeDesc s_typeDesc = SimpleTypeDesc(Type_SimpleType_std_string); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const bool&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_bool); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const char&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_char); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const int8_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_int8); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const int16_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_int16); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const int32_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_int32); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const int64_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_int64); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const uint8_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_uint8); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const uint16_t&)		{ static TypeDesc s_typeDesc = TypeDesc(Type_uint16); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const uint32_t&)		{ static TypeDesc s_typeDesc = TypeDesc(Type_uint32); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const uint64_t&)		{ static TypeDesc s_typeDesc = TypeDesc(Type_uint64); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const float&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_float); return &s_typeDesc; }
+	const mirror::TypeDesc* GetTypeDesc(const double&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_double); return &s_typeDesc; }
 
 #define OFFSET_BASIS	2166136261
 #define FNV_PRIME		16777619
@@ -64,7 +63,8 @@ namespace mirror
 	}
 
 	Class::Class(const char* _name, size_t _typeHash)
-		: m_typeHash(_typeHash)
+		: TypeDesc(Type_Class)
+		, m_typeHash(_typeHash)
 		, m_name(_name)
 	{
 
@@ -126,18 +126,9 @@ namespace mirror
 		m_classesByTypeHash.erase(it2);
 	}
 
-	SimpleTypeDesc::SimpleTypeDesc(Type _typeID)
-		: m_type(_typeID)
-	{
-	}
-
-	mirror::Type SimpleTypeDesc::getType() const
-	{
-		return m_type;
-	}
-
 	PointerTypeDesc::PointerTypeDesc(const TypeDesc* _subType)
-		: m_subType(_subType)
+		: TypeDesc(Type_Pointer)
+		, m_subType(_subType)
 	{
 		
 	}
