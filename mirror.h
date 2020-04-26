@@ -85,9 +85,9 @@ namespace mirror
 	public:
 		Class(const char* _name, size_t _typeHash);
 
-		inline const std::vector<ClassMember>& getMembers() const { return m_members; }
-		inline const char* getName() const { return m_name; }
-		inline size_t getTypeHash() const { return m_typeHash; }
+		const std::vector<ClassMember>& getMembers() const { return m_members; }
+		const char* getName() const { return m_name; }
+		size_t getTypeHash() const { return m_typeHash; }
 
 		void addMember(const ClassMember& _member);
 

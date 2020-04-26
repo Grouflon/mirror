@@ -7,7 +7,8 @@ namespace mirror
 	class StdVectorTypeDesc : public TypeDesc
 	{
 	public:
-		StdVectorTypeDesc();
+
+		StdVectorTypeDesc() : TypeDesc(Type_std_vector) {}
 
 		virtual void instanceResize(void* _instance, size_t _size) const = 0;
 		virtual size_t instanceSize(void* _instance) const = 0;
