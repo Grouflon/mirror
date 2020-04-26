@@ -6,6 +6,8 @@ namespace mirror
 	{
 		Type_none = 0,
 
+		Type_void,
+
 		Type_bool,
 		Type_char,
 		Type_int8,

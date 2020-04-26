@@ -6,25 +6,12 @@
 
 namespace mirror
 {
-	ClassSet	g_classSet;
-
-	const mirror::TypeDesc* GetTypeDesc(const bool&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_bool); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const char&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_char); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const int8_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_int8); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const int16_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_int16); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const int32_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_int32); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const int64_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_int64); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const uint8_t&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_uint8); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const uint16_t&)		{ static TypeDesc s_typeDesc = TypeDesc(Type_uint16); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const uint32_t&)		{ static TypeDesc s_typeDesc = TypeDesc(Type_uint32); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const uint64_t&)		{ static TypeDesc s_typeDesc = TypeDesc(Type_uint64); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const float&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_float); return &s_typeDesc; }
-	const mirror::TypeDesc* GetTypeDesc(const double&)			{ static TypeDesc s_typeDesc = TypeDesc(Type_double); return &s_typeDesc; }
+	ClassSet g_classSet;
 
 #define OFFSET_BASIS	2166136261
 #define FNV_PRIME		16777619
 
-	uint32_t mirror::Hash32(const void* _data, size_t _size)
+	uint32_t Hash32(const void* _data, size_t _size)
 	{
 		if (_size == 0)
 		{
@@ -44,7 +31,7 @@ namespace mirror
 		return hash;
 	}
 
-	uint32_t mirror::HashCString(const char* _str)
+	uint32_t HashCString(const char* _str)
 	{
 		return Hash32(_str, strlen(_str));
 	}
@@ -54,7 +41,6 @@ namespace mirror
 		, offset(_offset)
 		, type(_type)
 	{
-
 	}
 
 	void* ClassMember::getInstanceMemberPointer(void* _classInstancePointer) const
@@ -107,9 +93,11 @@ namespace mirror
 		uint32_t nameHash = HashCString(_class->getName());
 		assert(m_classesByNameHash.find(nameHash) == m_classesByNameHash.end());
 		assert(m_classesByTypeHash.find(_class->getTypeHash()) == m_classesByTypeHash.end());
+		assert(m_classes.find(_class) == m_classes.end());
 
 		m_classesByNameHash.insert(std::make_pair(nameHash, _class));
 		m_classesByTypeHash.insert(std::make_pair(_class->getTypeHash(), _class));
+		m_classes.emplace(_class);
 	}
 
 	void ClassSet::removeClass(Class* _class)
@@ -124,6 +112,15 @@ namespace mirror
 		auto it2 = m_classesByTypeHash.find(_class->getTypeHash());
 		assert(it2 != m_classesByTypeHash.end());
 		m_classesByTypeHash.erase(it2);
+
+		auto it3 = m_classes.find(_class);
+		assert(it3 != m_classes.end());
+		m_classes.erase(it3);
+	}
+
+	const std::set<Class*>& ClassSet::GetClasses() const
+	{
+		return m_classes;
 	}
 
 	PointerTypeDesc::PointerTypeDesc(const TypeDesc* _subType)
@@ -132,6 +129,5 @@ namespace mirror
 	{
 		
 	}
-
 }
 

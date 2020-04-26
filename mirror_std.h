@@ -7,7 +7,7 @@ namespace mirror
 	class StdVectorTypeDesc : public TypeDesc
 	{
 	public:
-		StdVectorTypeDesc(size_t _typeHash);
+		StdVectorTypeDesc();
 
 		virtual void instanceResize(void* _instance, size_t _size) const = 0;
 		virtual size_t instanceSize(void* _instance) const = 0;
@@ -30,15 +30,13 @@ namespace mirror
 		virtual void* instanceGetDataPointerAt(void* _instance, size_t _index) const override;
 	};
 
-	const TypeDesc* GetTypeDesc(const std::string&);
-	template <typename T> const TypeDesc* GetTypeDesc(const std::vector<T>& _v) { return new TStdVectorTypeDesc<T>(); }
+	template <> struct TypeDescGetter<std::string> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_std_string); return &s_typeDesc; } };
+	template <typename T> struct TypeDescGetter<std::vector<T>> { static const TypeDesc* Get() { static TStdVectorTypeDesc<T> s_vectorTypeDesc; return &s_vectorTypeDesc; } };
 }
-
 
 // INL
 template <typename T>
 mirror::TStdVectorTypeDesc<T>::TStdVectorTypeDesc()
-	: StdVectorTypeDesc(typeid(std::vector<T>))
 {
 	m_subType = GetTypeDesc(T());
 }
