@@ -3,6 +3,7 @@
 #include <cassert>
 
 #include "../mirror.h"
+#include "../mirror_std.h"
 
 namespace mirror
 {

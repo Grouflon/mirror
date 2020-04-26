@@ -8,7 +8,6 @@
 #include <typeinfo>
 
 #include <mirror_types.h>
-#include <mirror_std.h>
 
 #define MIRROR_CLASS(_class)\
 public:\
@@ -29,7 +28,7 @@ public:\
 		return mClass;\
 	}
 
-#define MIRROR_MEMBER(_memberName)\
+#define MIRROR_MEMBER(_memberName, ...)\
 	{\
 		size_t offset = reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(prototypePtr);\
 		const mirror::TypeDesc* type = mirror::GetTypeDesc(prototypePtr->_memberName);\
