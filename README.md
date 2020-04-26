@@ -21,7 +21,7 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 - Inside the second pair of parenthesis, declare the members that should be reflected using the `MIRROR_MEMBER(<memberName>)` macro
 - Here is an example declaration:
 
-```
+```C++
 struct MyStruct
 {
 	int a;
