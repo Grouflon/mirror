@@ -7,9 +7,9 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 
 ## How to install
 ### Using CMAKE
-- Add "find_package(MIRROR REQUIRED HINTS "./<path-to-mirror-relative-to-your-cmakelists-file>")" in your CMakeLists.txt
-- Add ${MIRROR_SOURCES} to your target sources list.
-- Add ${MIRROR_INCLUDE_DIRS} to your target include folders list.
+- Add `find_package(MIRROR REQUIRED HINTS "./<path-to-mirror-relative-to-your-cmakelists-file>")` in your CMakeLists.txt
+- Add `${MIRROR_SOURCES}` to your target sources list.
+- Add `${MIRROR_INCLUDE_DIRS}` to your target include folders list.
 
 ### Manually
 - Compile mirror.cpp alongside your project
@@ -22,7 +22,7 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 - In the second pair of `MIRROR_MEMBER` parenthesis, you can declare key / value metadata pairs to your member separated by `,` (value is optional).
 - Here is an example declaration:
 
-```
+```C++
 struct MyStruct
 {
 	int a;
