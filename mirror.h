@@ -14,27 +14,34 @@
 public:\
 	static const mirror::Class* GetClass()\
 	{\
-		mirror::Class* mClass = mirror::g_classSet.findClassByTypeHash(typeid(_class).hash_code());\
-		if (!mClass)\
+		static mirror::Class* s_class = nullptr;\
+		if (!s_class)\
 		{\
-			mClass = new mirror::Class(#_class, typeid(_class).hash_code());\
-			mirror::g_classSet.addClass(mClass);\
+			s_class = new mirror::Class(#_class, typeid(_class).hash_code());\
+			mirror::g_classSet.addClass(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
-			_MIRROR_CONTENT
+			_MIRROR_CLASS_CONTENT
 
-#define _MIRROR_CONTENT(...)\
+#define _MIRROR_CLASS_CONTENT(...)\
 			__VA_ARGS__\
 		}\
-		return mClass;\
+		return s_class;\
 	}
 
 #define MIRROR_MEMBER(_memberName)\
 	{\
 		size_t offset = reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(prototypePtr);\
 		const mirror::TypeDesc* type = mirror::GetTypeDesc(prototypePtr->_memberName);\
-		mClass->addMember(mirror::ClassMember(#_memberName, offset, type));\
+		const char* memberName = #_memberName;\
+		_MIRROR_MEMBER_CONTENT
+
+#define _MIRROR_MEMBER_CONTENT(...)\
+		const char* metaDataString = #__VA_ARGS__##"";\
+		mirror::ClassMember classMember(memberName, offset, type, metaDataString);\
+		s_class->addMember(classMember);\
 	}
+
 
 /*#define MIRROR_MEMBER_CSTRING()
 #define MIRROR_MEMBER_CFIXEDARRAY()
@@ -70,13 +77,38 @@ namespace mirror
 
 	struct ClassMember
 	{
-		ClassMember(const char* _name, size_t _offset, const TypeDesc* _type);
+		friend class Class;
 
+		ClassMember(const char* _name, size_t _offset, const TypeDesc* _type, const char* _metaDataString);
+
+		const char* getName() const;
+		size_t getOffset() const;
+		const TypeDesc* getType() const;
 		void* getInstanceMemberPointer(void* _classInstancePointer) const;
 
-		const char* name;
-		size_t offset;
-		const TypeDesc* type;
+		struct MetaData
+		{
+			MetaData(const char* _name, const char* _data);
+
+			const char* getName() const;
+
+			bool asBool() const;
+			int asInt() const;
+			float asFloat() const;
+			const char* asString() const;
+
+		private:
+			std::string m_name;
+			std::string m_data;
+		};
+
+		MetaData* getMetaData(const char* _key) const;
+
+	private:
+		std::string m_name;
+		size_t m_offset;
+		const TypeDesc* m_type;
+		std::unordered_map<uint32_t, MetaData> m_metaData;
 	};
 
 
@@ -86,7 +118,7 @@ namespace mirror
 		Class(const char* _name, size_t _typeHash);
 
 		const std::vector<ClassMember>& getMembers() const { return m_members; }
-		const char* getName() const { return m_name; }
+		const char* getName() const { return m_name.c_str(); }
 		size_t getTypeHash() const { return m_typeHash; }
 
 		void addMember(const ClassMember& _member);
@@ -94,7 +126,7 @@ namespace mirror
 	private:
 		std::vector<ClassMember> m_members;
 		size_t m_typeHash;
-		const char* m_name;
+		std::string m_name;
 	};
 
 	

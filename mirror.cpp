@@ -36,16 +36,118 @@ namespace mirror
 		return Hash32(_str, strlen(_str));
 	}
 
-	ClassMember::ClassMember(const char* _name, size_t _offset, const TypeDesc* _type)
-		: name(_name)
-		, offset(_offset)
-		, type(_type)
+	void sanitizeMetaDataString(char* _buf)
 	{
+		assert(_buf);
+
+		bool hasFirstChar = false;
+		char* firstChar = _buf;
+		char* lastChar = _buf;
+		for (char* cur = _buf; *cur != 0; ++cur)
+		{
+			if (*cur != ' ')
+			{
+				if (!hasFirstChar)
+				{
+					firstChar = cur;
+					lastChar = cur;
+					hasFirstChar = true;
+				}
+				else
+				{
+					lastChar = cur + 1;
+				}
+				
+			}
+		}
+
+		size_t len = lastChar - firstChar;
+		strncpy(_buf, firstChar, len);
+		_buf[len] = 0;
+	}
+
+	ClassMember::ClassMember(const char* _name, size_t _offset, const TypeDesc* _type, const char* _metaDataString)
+		: m_name(_name)
+		, m_offset(_offset)
+		, m_type(_type)
+	{
+		// Parse meta data
+		assert(_metaDataString);
+		size_t len = strlen(_metaDataString);
+
+		const char* key = _metaDataString;
+		size_t keyLen = 0;
+		const char* value = nullptr;
+		size_t valueLen = 0;
+		int mode = 0;
+		for (const char* cur = _metaDataString; cur <= _metaDataString + len; ++cur)
+		{
+			if (*cur == ',' || cur == _metaDataString + len)
+			{
+				if (value == nullptr)
+				{
+					keyLen = cur - key;
+				}
+				else
+				{
+					valueLen = cur - value;
+				}
+
+				if (keyLen == 0)
+					continue;
+
+				assert(keyLen < 256);
+				char keyBuf[256];
+				char valueBuf[256];
+
+				strncpy(keyBuf, key, keyLen);
+				keyBuf[keyLen] = 0;
+
+				if (value)
+				{
+					strncpy(valueBuf, value, valueLen);
+				}
+				valueBuf[valueLen] = 0;
+
+				sanitizeMetaDataString(keyBuf);
+				sanitizeMetaDataString(valueBuf);
+
+				MetaData metaData(keyBuf, valueBuf);
+				m_metaData.insert(std::make_pair(HashCString(metaData.getName()), metaData));
+
+				key = cur + 1;
+			}
+			else if (value == nullptr && *cur == '=')
+			{
+				keyLen = cur - key;
+				value = cur + 1;
+			}
+		}
+	}
+
+	const char* ClassMember::getName() const
+	{
+		return m_name.c_str();
+	}
+
+	size_t ClassMember::getOffset() const
+	{
+		return m_offset;
+	}
+
+	const mirror::TypeDesc* ClassMember::getType() const
+	{
+		return m_type;
 	}
 
 	void* ClassMember::getInstanceMemberPointer(void* _classInstancePointer) const
 	{
-		return reinterpret_cast<uint8_t*>(_classInstancePointer) + offset;
+		return reinterpret_cast<uint8_t*>(_classInstancePointer) + m_offset;
+	}
+
+	mirror::ClassMember::MetaData* ClassMember::getMetaData(const char* _key) const
+	{
+		return nullptr;
 	}
 
 	Class::Class(const char* _name, size_t _typeHash)
@@ -59,7 +161,7 @@ namespace mirror
 	void Class::addMember(const ClassMember& _member)
 	{
 		// Checks if a member with the same name does not already exists
-		assert(std::find_if(m_members.begin(), m_members.end(), [_member](const ClassMember& _m) { return strcmp(_member.name, _m.name) == 0; }) == m_members.end());
+		assert(std::find_if(m_members.begin(), m_members.end(), [_member](const ClassMember& _m) { return _member.m_name == _m.m_name; }) == m_members.end());
 
 		m_members.push_back(_member);
 	}
@@ -129,5 +231,38 @@ namespace mirror
 	{
 		
 	}
+
+	ClassMember::MetaData::MetaData(const char* _name, const char* _data)
+		: m_name(_name)
+		, m_data(_data)
+	{
+		
+	}
+
+	const char* ClassMember::MetaData::getName() const
+	{
+		return m_name.c_str();
+	}
+
+	bool ClassMember::MetaData::asBool() const
+	{
+		return false;
+	}
+
+	int ClassMember::MetaData::asInt() const
+	{
+		return 0;
+	}
+
+	float ClassMember::MetaData::asFloat() const
+	{
+		return 0.f;
+	}
+
+	const char* ClassMember::MetaData::asString() const
+	{
+		return m_data.c_str();
+	}
+
 }
 

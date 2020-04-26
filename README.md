@@ -18,7 +18,8 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 ## How to declare
 - Include '<mirror.h>' in the header of the class you want to reflect.
 - Declare your class as reflected inside its scope by using the `MIRROR_CLASS(<className>)(...)` macro (note that this macro leaves the accessibility of your class public)
-- Inside the second pair of parenthesis, declare the members that should be reflected using the `MIRROR_MEMBER(<memberName>)` macro
+- Inside the second pair of parenthesis, declare the members that should be reflected using the `MIRROR_MEMBER(<memberName>)(<meta-data>)` macro
+- In the second pair of `MIRROR_MEMBER` parenthesis, you can declare key / value metadata pairs to your member separated by `,` (value is optional).
 - Here is an example declaration:
 
 ```
@@ -28,7 +29,7 @@ struct MyStruct
 
 	MIRROR_CLASS(MyStruct)
 	(
-		MIRROR_MEMBER(a)
+		MIRROR_MEMBER(a)()
 	)
 };
 
@@ -44,13 +45,13 @@ class MyClass
 
 	MIRROR_CLASS(MyClass)
 	(
-		MIRROR_MEMBER(a)
-		MIRROR_MEMBER(b)
-		MIRROR_MEMBER(c)
-		MIRROR_MEMBER(d)
-		MIRROR_MEMBER(e)
-		MIRROR_MEMBER(f)
-		MIRROR_MEMBER(g)
+		MIRROR_MEMBER(a)()
+		MIRROR_MEMBER(b)(Transient)
+		MIRROR_MEMBER(c)(ShowOnGUI, Width = 100)
+		MIRROR_MEMBER(d)(Version = 12)
+		MIRROR_MEMBER(e)()
+		MIRROR_MEMBER(f)(Deprecated)
+		MIRROR_MEMBER(g)()
 	)
 };
 ```

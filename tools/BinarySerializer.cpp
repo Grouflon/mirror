@@ -211,7 +211,7 @@ namespace mirror
 				FDataBuffer* instanceDataBuffer = _getDataBufferFromPool();
 				for (const ClassMember& member : clss->getMembers())
 				{
-					_serializeEntry(instanceDataBuffer, member.name, member.getInstanceMemberPointer(_object), member.type);
+					_serializeEntry(instanceDataBuffer, member.getName(), member.getInstanceMemberPointer(_object), member.getType());
 				}
 				_dataBuffer->write(instanceDataBuffer->dataLength);
 				_dataBuffer->write(instanceDataBuffer->data, instanceDataBuffer->dataLength);
@@ -224,7 +224,7 @@ namespace mirror
 				FDataBuffer instanceDataBuffer = FDataBuffer(_dataBuffer->data + _dataBuffer->cursor, dataLength);
 				for (const ClassMember& member : clss->getMembers())
 				{
-					_serializeEntry(&instanceDataBuffer, member.name, member.getInstanceMemberPointer(_object), member.type);
+					_serializeEntry(&instanceDataBuffer, member.getName(), member.getInstanceMemberPointer(_object), member.getType());
 				}
 				_dataBuffer->cursor += dataLength;
 			}
