@@ -183,6 +183,18 @@ namespace mirror
 		}
 	}
 
+	bool Class::isChildOf(const Class* _class, bool _checkSelf) const
+	{
+		if (_class == this)
+			return _checkSelf;
+
+		for (Class* parent : m_parents)
+		{
+			return parent->isChildOf(_class, true);
+		}
+		return false;
+	}
+
 	void Class::addMember(ClassMember* _member)
 	{
 		assert(_member);

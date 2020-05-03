@@ -92,6 +92,8 @@ namespace mirror
 		const std::set<Class*>& getParents() const { return m_parents; }
 		const std::set<Class*>& getChildren() const { return m_children; }
 
+		bool isChildOf(const Class* _class, bool _checkSelf = true) const;
+
 		void addMember(ClassMember* _member);
 		void addParent(Class* _parent);
 

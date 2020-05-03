@@ -4,6 +4,23 @@
 
 #define MIRROR_CLASS(_class, ...)\
 public:\
+	virtual mirror::Class* getClass() const { return _class::GetClass(); }\
+	\
+	static mirror::Class* GetClass()\
+	{\
+		static mirror::Class* s_class = nullptr;\
+		if (!s_class)\
+		{\
+			s_class = new mirror::Class(#_class, typeid(_class).hash_code());\
+			mirror::g_classSet.addClass(s_class);\
+			char fakePrototype[sizeof(_class)] = {};\
+			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
+			_MIRROR_CLASS_CONTENT
+
+#define MIRROR_CLASS_NOVIRTUAL(_class, ...)\
+public:\
+	mirror::Class* getClass() const { return _class::GetClass(); }\
+	\
 	static mirror::Class* GetClass()\
 	{\
 		static mirror::Class* s_class = nullptr;\
