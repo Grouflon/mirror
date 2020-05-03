@@ -20,6 +20,7 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 - Declare your class as reflected inside its scope by using the `MIRROR_CLASS(<className>)(...)` macro (note that this macro leaves the accessibility of your class public)
 - Inside the second pair of parenthesis, declare the members that should be reflected using the `MIRROR_MEMBER(<memberName>)(<meta-data>)` macro
 - In the second pair of `MIRROR_MEMBER` parenthesis, you can declare key / value metadata pairs to your member separated by `,` (value is optional).
+- You can declare inheritance on other mirrored classes by using the `MIRROR_PARENT` macro. Note that mirror supports multiple inheritance.
 - Here is an example declaration:
 
 ```C++
@@ -33,7 +34,7 @@ struct MyStruct
 	)
 };
 
-class MyClass
+class MyClass : public MyParent
 {
 	bool a;
 	float b;
@@ -45,6 +46,8 @@ class MyClass
 
 	MIRROR_CLASS(MyClass)
 	(
+		MIRROR_PARENT(MyParent)
+
 		MIRROR_MEMBER(a)()
 		MIRROR_MEMBER(b)(Transient)
 		MIRROR_MEMBER(c)(ShowOnGUI, Width = 100)
@@ -58,6 +61,8 @@ class MyClass
 
 ## How to use
 - Any reflected class gains a public `GetClass()` static function that allow to iterate through reflected members, access their types and find their address on given instances.
+- Classes inheritance schemes can be checked at runtime by using the `Class::isChildOf` method.
+- A cheap dynamic cast is also available by using the `mirror::Cast<TargetType>(SourceType)` method.
 
 ## Tools
 Mirror comes with a set of tools that works on reflected classes and can leverage the power of reflection.

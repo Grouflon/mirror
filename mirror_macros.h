@@ -15,7 +15,7 @@ public:\
 			mirror::g_classSet.addClass(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
-			_MIRROR_CLASS_CONTENT
+			__MIRROR_CLASS_CONTENT
 
 #define MIRROR_CLASS_NOVIRTUAL(_class, ...)\
 public:\
@@ -30,9 +30,9 @@ public:\
 			mirror::g_classSet.addClass(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
-			_MIRROR_CLASS_CONTENT
+			__MIRROR_CLASS_CONTENT
 
-#define _MIRROR_CLASS_CONTENT(...)\
+#define __MIRROR_CLASS_CONTENT(...)\
 			__VA_ARGS__\
 		}\
 		return s_class;\
@@ -43,9 +43,9 @@ public:\
 		size_t offset = reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(prototypePtr);\
 		mirror::TypeDesc* type = mirror::GetTypeDesc(prototypePtr->_memberName);\
 		const char* memberName = #_memberName;\
-		_MIRROR_MEMBER_CONTENT
+		__MIRROR_MEMBER_CONTENT
 
-#define _MIRROR_MEMBER_CONTENT(...)\
+#define __MIRROR_MEMBER_CONTENT(...)\
 		const char* metaDataString = #__VA_ARGS__##"";\
 		mirror::ClassMember* classMember = new mirror::ClassMember(memberName, offset, type, metaDataString);\
 		s_class->addMember(classMember);\

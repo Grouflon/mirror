@@ -187,6 +187,61 @@ namespace mirror
 		return nullptr;
 	}
 
+	template <typename DestType, typename SourceType, typename IsDestLastPointer = void, typename IsSourceLastPointer = void>
+	struct CastClassesUnpiler
+	{
+		static bool Unpile(Class** _destClass, Class** _sourceClass)
+		{
+			return CastClassesUnpiler<std::remove_pointer<DestType>::type, std::remove_pointer<SourceType>::type>::Unpile(_destClass, _sourceClass);
+		}
+	};
+
+	template <typename DestType, typename SourceType>
+	struct CastClassesUnpiler<DestType, SourceType, std::enable_if_t<std::is_pointer<DestType>::value>, std::enable_if_t<!std::is_pointer<SourceType>::value>>
+	{
+		static bool Unpile(Class** _destClass, Class** _sourceClass)
+		{
+			static_assert(false, "Mismatching pointer count between cast source and cast destination.");
+		}
+	};
+
+	template <typename DestType, typename SourceType>
+	struct CastClassesUnpiler<DestType, SourceType, std::enable_if_t<!std::is_pointer<DestType>::value>, std::enable_if_t<std::is_pointer<SourceType>::value>>
+	{
+		static bool Unpile(Class** _destClass, Class** _sourceClass)
+		{
+			static_assert(false, "Mismatching pointer count between cast source and cast destination.");
+		}
+	};
+
+	template <typename DestType, typename SourceType>
+	struct CastClassesUnpiler<DestType, SourceType, std::enable_if_t<!std::is_pointer<DestType>::value>, std::enable_if_t<!std::is_pointer<SourceType>::value>>
+	{
+		static bool Unpile(Class** _destClass, Class** _sourceClass)
+		{
+			*_destClass = DestType::GetClass();
+			*_sourceClass = SourceType::GetClass();
+
+			return true;
+		}
+	};
+
+	template <typename DestType, typename SourceType>
+	DestType Cast(SourceType _o)
+	{
+		Class* destClass = nullptr;
+		Class* sourceClass = nullptr;
+		if (CastClassesUnpiler<DestType, SourceType>::Unpile(&destClass, &sourceClass))
+		{
+			if (destClass->isChildOf(sourceClass) // upcast
+				|| sourceClass->isChildOf(destClass)) // downcast
+			{
+				return reinterpret_cast<DestType>(_o);
+			}
+		}
+		return nullptr;
+	}
+
 	uint32_t Hash32(const void* _data, size_t _size);
 	uint32_t HashCString(const char* _str);
 
