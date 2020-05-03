@@ -10,9 +10,9 @@
 
 #include <mirror_types.h>
 
-#define MIRROR_CLASS(_class)\
+#define MIRROR_CLASS(_class, ...)\
 public:\
-	static const mirror::Class* GetClass()\
+	static mirror::Class* GetClass()\
 	{\
 		static mirror::Class* s_class = nullptr;\
 		if (!s_class)\
@@ -32,7 +32,7 @@ public:\
 #define MIRROR_MEMBER(_memberName)\
 	{\
 		size_t offset = reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(prototypePtr);\
-		const mirror::TypeDesc* type = mirror::GetTypeDesc(prototypePtr->_memberName);\
+		mirror::TypeDesc* type = mirror::GetTypeDesc(prototypePtr->_memberName);\
 		const char* memberName = #_memberName;\
 		_MIRROR_MEMBER_CONTENT
 
@@ -40,6 +40,11 @@ public:\
 		const char* metaDataString = #__VA_ARGS__##"";\
 		mirror::ClassMember classMember(memberName, offset, type, metaDataString);\
 		s_class->addMember(classMember);\
+	}
+
+#define MIRROR_PARENT(_parentClass)\
+	{\
+		s_class->addParent(mirror::GetClass<_parentClass>());\
 	}
 
 
@@ -67,23 +72,23 @@ namespace mirror
 	class PointerTypeDesc : public TypeDesc
 	{
 	public:
-		PointerTypeDesc(const TypeDesc* _subType);
+		PointerTypeDesc(TypeDesc* _subType);
 
-		const TypeDesc* getSubType() const { return m_subType; }
+		TypeDesc* getSubType() const { return m_subType; }
 
 	private:
-		const TypeDesc* m_subType;
+		TypeDesc* m_subType;
 	};
 
 	struct ClassMember
 	{
 		friend class Class;
 
-		ClassMember(const char* _name, size_t _offset, const TypeDesc* _type, const char* _metaDataString);
+		ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString);
 
 		const char* getName() const;
 		size_t getOffset() const;
-		const TypeDesc* getType() const;
+		TypeDesc* getType() const;
 		void* getInstanceMemberPointer(void* _classInstancePointer) const;
 
 		struct MetaData
@@ -107,7 +112,7 @@ namespace mirror
 	private:
 		std::string m_name;
 		size_t m_offset;
-		const TypeDesc* m_type;
+		TypeDesc* m_type;
 		std::unordered_map<uint32_t, MetaData> m_metaData;
 	};
 
@@ -122,8 +127,11 @@ namespace mirror
 		size_t getTypeHash() const { return m_typeHash; }
 
 		void addMember(const ClassMember& _member);
+		void addParent(Class* _parent);
 
 	private:
+		std::set<Class*> m_parents;
+		std::set<Class*> m_children;
 		std::vector<ClassMember> m_members;
 		size_t m_typeHash;
 		std::string m_name;
@@ -152,7 +160,7 @@ namespace mirror
 	template <typename T, typename IsPointer = void, typename IsEnum = void>
 	struct TypeDescGetter
 	{
-		static const TypeDesc* Get()
+		static TypeDesc* Get()
 		{
 			return T::GetClass();
 		}
@@ -161,7 +169,7 @@ namespace mirror
 	template <typename T>
 	struct TypeDescGetter<T, std::enable_if_t<std::is_pointer<T>::value>>
 	{
-		static const TypeDesc* Get()
+		static TypeDesc* Get()
 		{
 			static PointerTypeDesc s_pointerTypeDesc(TypeDescGetter<std::remove_pointer<T>::type>::Get()); return &s_pointerTypeDesc;
 		}
@@ -170,7 +178,7 @@ namespace mirror
 	template <typename T>
 	struct TypeDescGetter<T, void, std::enable_if_t<std::is_enum<T>::value>>
 	{
-		static const TypeDesc* Get()
+		static TypeDesc* Get()
 		{
 			switch (sizeof(T))
 			{
@@ -183,22 +191,33 @@ namespace mirror
 		}
 	};
 
-	template <> struct TypeDescGetter<void> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_void); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<bool> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_bool); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<char> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_char); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int8_t> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int8); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int16_t> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int16); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int32_t> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int32); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int64_t> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int64); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint8_t> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint8); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint16_t> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint16); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint32_t> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint32); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint64_t> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint64); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<float> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_float); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<double> { static const TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<void> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_void); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<bool> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_bool); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<char> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_char); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int8); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int16); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int32); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int64); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint8); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint16); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint32); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint64); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<float> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_float); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double); return &s_typeDesc; } };
 
 	template <typename T>
-	const TypeDesc* GetTypeDesc(T) { return TypeDescGetter<T>::Get(); }
+	TypeDesc* GetTypeDesc(T) { return TypeDescGetter<T>::Get(); }
+
+	template <typename T>
+	Class* GetClass()
+	{ 
+		TypeDesc* typeDesc = TypeDescGetter<T>::Get();
+		if (typeDesc->getType() == Type_Class)
+		{
+			return static_cast<Class*>(typeDesc);
+		}
+		return nullptr;
+	}
 
 	uint32_t Hash32(const void* _data, size_t _size);
 	uint32_t HashCString(const char* _str);

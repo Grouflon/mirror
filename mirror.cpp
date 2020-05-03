@@ -66,7 +66,7 @@ namespace mirror
 		_buf[len] = 0;
 	}
 
-	ClassMember::ClassMember(const char* _name, size_t _offset, const TypeDesc* _type, const char* _metaDataString)
+	ClassMember::ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString)
 		: m_name(_name)
 		, m_offset(_offset)
 		, m_type(_type)
@@ -135,7 +135,7 @@ namespace mirror
 		return m_offset;
 	}
 
-	const mirror::TypeDesc* ClassMember::getType() const
+	mirror::TypeDesc* ClassMember::getType() const
 	{
 		return m_type;
 	}
@@ -164,6 +164,16 @@ namespace mirror
 		assert(std::find_if(m_members.begin(), m_members.end(), [_member](const ClassMember& _m) { return _member.m_name == _m.m_name; }) == m_members.end());
 
 		m_members.push_back(_member);
+	}
+
+	void Class::addParent(Class* _parent)
+	{
+		assert(_parent);
+		assert(std::find(m_parents.begin(), m_parents.end(), _parent) == m_parents.end());
+		assert(std::find(_parent->m_children.begin(), _parent->m_children.end(), this) == _parent->m_children.end());
+
+		m_parents.insert(_parent);
+		_parent->m_children.insert(this);
 	}
 
 	ClassSet::~ClassSet()
@@ -225,7 +235,7 @@ namespace mirror
 		return m_classes;
 	}
 
-	PointerTypeDesc::PointerTypeDesc(const TypeDesc* _subType)
+	PointerTypeDesc::PointerTypeDesc(TypeDesc* _subType)
 		: TypeDesc(Type_Pointer)
 		, m_subType(_subType)
 	{
