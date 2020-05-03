@@ -8,6 +8,38 @@ namespace mirror
 {
 	ClassSet g_classSet;
 
+	MetaData::MetaData(const char* _name, const char* _data)
+		: m_name(_name)
+		, m_data(_data)
+	{
+
+	}
+
+	const char* MetaData::getName() const
+	{
+		return m_name.c_str();
+	}
+
+	bool MetaData::asBool() const
+	{
+		return false;
+	}
+
+	int MetaData::asInt() const
+	{
+		return 0;
+	}
+
+	float MetaData::asFloat() const
+	{
+		return 0.f;
+	}
+
+	const char* MetaData::asString() const
+	{
+		return m_data.c_str();
+	}
+
 #define OFFSET_BASIS	2166136261
 #define FNV_PRIME		16777619
 
@@ -125,27 +157,12 @@ namespace mirror
 		}
 	}
 
-	const char* ClassMember::getName() const
-	{
-		return m_name.c_str();
-	}
-
-	size_t ClassMember::getOffset() const
-	{
-		return m_offset;
-	}
-
-	mirror::TypeDesc* ClassMember::getType() const
-	{
-		return m_type;
-	}
-
 	void* ClassMember::getInstanceMemberPointer(void* _classInstancePointer) const
 	{
 		return reinterpret_cast<uint8_t*>(_classInstancePointer) + m_offset;
 	}
 
-	mirror::ClassMember::MetaData* ClassMember::getMetaData(const char* _key) const
+	mirror::MetaData* ClassMember::getMetaData(const char* _key) const
 	{
 		return nullptr;
 	}
@@ -158,11 +175,22 @@ namespace mirror
 
 	}
 
-	void Class::addMember(const ClassMember& _member)
+	Class::~Class()
 	{
-		// Checks if a member with the same name does not already exists
-		assert(std::find_if(m_members.begin(), m_members.end(), [_member](const ClassMember& _m) { return _member.m_name == _m.m_name; }) == m_members.end());
+		for (ClassMember* member : m_members)
+		{
+			delete member;
+		}
+	}
 
+	void Class::addMember(ClassMember* _member)
+	{
+		assert(_member);
+		assert(std::find(m_members.begin(), m_members.end(), _member) == m_members.end());
+		// Checks if a member with the same name does not already exists
+		assert(std::find_if(m_members.begin(), m_members.end(), [_member](const ClassMember* _m) { return _member->m_name == _m->m_name; }) == m_members.end());
+
+		_member->m_class = this;
 		m_members.push_back(_member);
 	}
 
@@ -240,38 +268,6 @@ namespace mirror
 		, m_subType(_subType)
 	{
 		
-	}
-
-	ClassMember::MetaData::MetaData(const char* _name, const char* _data)
-		: m_name(_name)
-		, m_data(_data)
-	{
-		
-	}
-
-	const char* ClassMember::MetaData::getName() const
-	{
-		return m_name.c_str();
-	}
-
-	bool ClassMember::MetaData::asBool() const
-	{
-		return false;
-	}
-
-	int ClassMember::MetaData::asInt() const
-	{
-		return 0;
-	}
-
-	float ClassMember::MetaData::asFloat() const
-	{
-		return 0.f;
-	}
-
-	const char* ClassMember::MetaData::asString() const
-	{
-		return m_data.c_str();
 	}
 
 }

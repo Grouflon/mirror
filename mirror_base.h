@@ -10,52 +10,26 @@
 
 #include <mirror_types.h>
 
-#define MIRROR_CLASS(_class, ...)\
-public:\
-	static mirror::Class* GetClass()\
-	{\
-		static mirror::Class* s_class = nullptr;\
-		if (!s_class)\
-		{\
-			s_class = new mirror::Class(#_class, typeid(_class).hash_code());\
-			mirror::g_classSet.addClass(s_class);\
-			char fakePrototype[sizeof(_class)] = {};\
-			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
-			_MIRROR_CLASS_CONTENT
-
-#define _MIRROR_CLASS_CONTENT(...)\
-			__VA_ARGS__\
-		}\
-		return s_class;\
-	}
-
-#define MIRROR_MEMBER(_memberName)\
-	{\
-		size_t offset = reinterpret_cast<size_t>(&(prototypePtr->_memberName)) - reinterpret_cast<size_t>(prototypePtr);\
-		mirror::TypeDesc* type = mirror::GetTypeDesc(prototypePtr->_memberName);\
-		const char* memberName = #_memberName;\
-		_MIRROR_MEMBER_CONTENT
-
-#define _MIRROR_MEMBER_CONTENT(...)\
-		const char* metaDataString = #__VA_ARGS__##"";\
-		mirror::ClassMember classMember(memberName, offset, type, metaDataString);\
-		s_class->addMember(classMember);\
-	}
-
-#define MIRROR_PARENT(_parentClass)\
-	{\
-		s_class->addParent(mirror::GetClass<_parentClass>());\
-	}
-
-
-/*#define MIRROR_MEMBER_CSTRING()
-#define MIRROR_MEMBER_CFIXEDARRAY()
-#define MIRROR_MEMBER_CDYNAMICARRAY()*/
-
 namespace mirror
 {
 	class Class;
 	class TypeDesc;
+
+	struct MetaData
+	{
+		MetaData(const char* _name, const char* _data);
+
+		const char* getName() const;
+
+		bool asBool() const;
+		int asInt() const;
+		float asFloat() const;
+		const char* asString() const;
+
+	private:
+		std::string m_name;
+		std::string m_data;
+	};
 
 	class TypeDesc
 	{
@@ -80,39 +54,27 @@ namespace mirror
 		TypeDesc* m_subType;
 	};
 
-	struct ClassMember
+	class ClassMember
 	{
 		friend class Class;
 
+	public:
 		ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString);
 
-		const char* getName() const;
-		size_t getOffset() const;
-		TypeDesc* getType() const;
+		const char* getName() const	{ return m_name.c_str(); }
+		Class* getClass() const { return m_class; }
+		size_t getOffset() const { return m_offset;	}
+		TypeDesc* getType() const { return m_type; }
+
 		void* getInstanceMemberPointer(void* _classInstancePointer) const;
-
-		struct MetaData
-		{
-			MetaData(const char* _name, const char* _data);
-
-			const char* getName() const;
-
-			bool asBool() const;
-			int asInt() const;
-			float asFloat() const;
-			const char* asString() const;
-
-		private:
-			std::string m_name;
-			std::string m_data;
-		};
 
 		MetaData* getMetaData(const char* _key) const;
 
 	private:
+		Class* m_class = nullptr;
 		std::string m_name;
 		size_t m_offset;
-		TypeDesc* m_type;
+		TypeDesc* m_type = nullptr;
 		std::unordered_map<uint32_t, MetaData> m_metaData;
 	};
 
@@ -121,18 +83,22 @@ namespace mirror
 	{
 	public:
 		Class(const char* _name, size_t _typeHash);
+		virtual ~Class();
 
-		const std::vector<ClassMember>& getMembers() const { return m_members; }
+		const std::vector<ClassMember*>& getMembers() const { return m_members; }
 		const char* getName() const { return m_name.c_str(); }
 		size_t getTypeHash() const { return m_typeHash; }
 
-		void addMember(const ClassMember& _member);
+		const std::set<Class*>& getParents() const { return m_parents; }
+		const std::set<Class*>& getChildren() const { return m_children; }
+
+		void addMember(ClassMember* _member);
 		void addParent(Class* _parent);
 
 	private:
 		std::set<Class*> m_parents;
 		std::set<Class*> m_children;
-		std::vector<ClassMember> m_members;
+		std::vector<ClassMember*> m_members;
 		size_t m_typeHash;
 		std::string m_name;
 	};

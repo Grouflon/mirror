@@ -12,6 +12,7 @@ set(MIRROR_HEADERS
   "${CMAKE_CURRENT_LIST_DIR}/mirror.h"
   "${CMAKE_CURRENT_LIST_DIR}/mirror_base.h"
   "${CMAKE_CURRENT_LIST_DIR}/mirror_std.h"
+  "${CMAKE_CURRENT_LIST_DIR}/mirror_macros.h"
   "${CMAKE_CURRENT_LIST_DIR}/mirror_types.h"
   "${CMAKE_CURRENT_LIST_DIR}/tools/BinarySerializer.h"
 )
