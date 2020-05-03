@@ -1,6 +1,6 @@
 #pragma once
 
-#include <mirror.h>
+#include <mirror_base.h>
 
 namespace mirror
 {
