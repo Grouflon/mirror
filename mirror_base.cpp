@@ -183,6 +183,19 @@ namespace mirror
 		}
 	}
 
+	void Class::getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers) const
+	{
+		_outMemberList.insert(_outMemberList.end(), m_members.begin(), m_members.end());
+
+		if (_includeInheritedMembers)
+		{
+			for (Class* parent : m_parents)
+			{
+				parent->getMembers(_outMemberList, true);
+			}
+		}
+	}
+
 	bool Class::isChildOf(const Class* _class, bool _checkSelf) const
 	{
 		if (_class == this)

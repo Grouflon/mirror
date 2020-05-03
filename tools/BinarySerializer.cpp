@@ -208,7 +208,9 @@ namespace mirror
 			if (m_isWriting)
 			{
 				FDataBuffer* instanceDataBuffer = _getDataBufferFromPool();
-				for (const ClassMember* member : clss->getMembers())
+				std::vector<mirror::ClassMember*> members;
+				clss->getMembers(members);
+				for (const ClassMember* member : members)
 				{
 					_serializeEntry(instanceDataBuffer, member->getName(), member->getInstanceMemberPointer(_object), member->getType());
 				}
@@ -221,7 +223,9 @@ namespace mirror
 				size_t dataLength = 0u;
 				_dataBuffer->read(dataLength);
 				FDataBuffer instanceDataBuffer = FDataBuffer(_dataBuffer->data + _dataBuffer->cursor, dataLength);
-				for (const ClassMember* member : clss->getMembers())
+				std::vector<mirror::ClassMember*> members;
+				clss->getMembers(members);
+				for (const ClassMember* member : members)
 				{
 					_serializeEntry(&instanceDataBuffer, member->getName(), member->getInstanceMemberPointer(_object), member->getType());
 				}

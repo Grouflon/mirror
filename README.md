@@ -4,6 +4,7 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 ## Manifesto (enforced in this framework, but actually applies to any coding project)
 - Simple ideas should be simple to write.
 - Redundant declaration is evil and should be avoided at all cost.
+- A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2020.
 
 ## How to install
 ### Using CMAKE
@@ -20,7 +21,7 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 - Declare your class as reflected inside its scope by using the `MIRROR_CLASS(<className>)(...)` macro (note that this macro leaves the accessibility of your class public)
 - Inside the second pair of parenthesis, declare the members that should be reflected using the `MIRROR_MEMBER(<memberName>)(<meta-data>)` macro
 - In the second pair of `MIRROR_MEMBER` parenthesis, you can declare key / value metadata pairs to your member separated by `,` (value is optional).
-- You can declare inheritance on other mirrored classes by using the `MIRROR_PARENT` macro. Note that mirror supports multiple inheritance.
+- You can declare inheritance on other mirrored classes by using the `MIRROR_PARENT(<parentClassName>)` macro. Note that mirror supports multiple inheritance.
 - Here is an example declaration:
 
 ```C++
@@ -62,7 +63,7 @@ class MyClass : public MyParent
 ## How to use
 - Any reflected class gains a public `GetClass()` static function that allow to iterate through reflected members, access their types and find their address on given instances.
 - Classes inheritance schemes can be checked at runtime by using the `Class::isChildOf` method.
-- A cheap dynamic cast is also available by using the `mirror::Cast<TargetType>(SourceType)` method.
+- A cheap dynamic cast is also available by using the static `mirror::Cast<TargetType>(SourceType)` method.
 
 ## Tools
 Mirror comes with a set of tools that works on reflected classes and can leverage the power of reflection.

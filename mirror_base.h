@@ -85,7 +85,7 @@ namespace mirror
 		Class(const char* _name, size_t _typeHash);
 		virtual ~Class();
 
-		const std::vector<ClassMember*>& getMembers() const { return m_members; }
+		void getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers = true) const;
 		const char* getName() const { return m_name.c_str(); }
 		size_t getTypeHash() const { return m_typeHash; }
 
