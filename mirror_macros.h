@@ -4,7 +4,7 @@
 
 #define MIRROR_CLASS(_class, ...)\
 public:\
-	virtual mirror::Class* getClass() const { return _class::GetClass(); }\
+	virtual mirror::Class* getClass() const override { return _class::GetClass(); }\
 	\
 	static mirror::Class* GetClass()\
 	{\
