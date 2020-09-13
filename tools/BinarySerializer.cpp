@@ -132,43 +132,43 @@ namespace mirror
 
 		switch (_typeDesc->getType())
 		{
-		case Type_SimpleType_bool:
+		case Type_bool:
 			_serialize<bool>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_char:
+		case Type_char:
 			_serialize<char>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_uint8:
+		case Type_uint8:
 			_serialize<uint8_t>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_uint16:
+		case Type_uint16:
 			_serialize<uint16_t>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_uint32:
+		case Type_uint32:
 			_serialize<uint32_t>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_uint64:
+		case Type_uint64:
 			_serialize<uint64_t>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_int8:
+		case Type_int8:
 			_serialize<int8_t>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_int16:
+		case Type_int16:
 			_serialize<int16_t>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_int32:
+		case Type_int32:
 			_serialize<int32_t>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_int64:
+		case Type_int64:
 			_serialize<int64_t>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_float:
+		case Type_float:
 			_serialize<float>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_double:
+		case Type_double:
 			_serialize<double>(_dataBuffer, _object);
 			break;
-		case Type_SimpleType_std_string:
+		case Type_std_string:
 		{
 			std::string* stringPtr = reinterpret_cast<std::string*>(_object);
 			if (m_isWriting)
@@ -183,7 +183,7 @@ namespace mirror
 		break;
 		case Type_std_vector:
 		{
-			const StdVectorTypeDescBase* vectorTypeDesc = static_cast<const StdVectorTypeDescBase*>(_typeDesc);
+			const StdVectorTypeDesc* vectorTypeDesc = static_cast<const StdVectorTypeDesc*>(_typeDesc);
 			size_t vectorSize = 0u;
 			if (m_isWriting)
 			{
@@ -208,9 +208,11 @@ namespace mirror
 			if (m_isWriting)
 			{
 				FDataBuffer* instanceDataBuffer = _getDataBufferFromPool();
-				for (const ClassMember& member : clss->getMembers())
+				std::vector<mirror::ClassMember*> members;
+				clss->getMembers(members);
+				for (const ClassMember* member : members)
 				{
-					_serializeEntry(instanceDataBuffer, member.name, member.getInstanceMemberPointer(_object), member.type);
+					_serializeEntry(instanceDataBuffer, member->getName(), member->getInstanceMemberPointer(_object), member->getType());
 				}
 				_dataBuffer->write(instanceDataBuffer->dataLength);
 				_dataBuffer->write(instanceDataBuffer->data, instanceDataBuffer->dataLength);
@@ -221,9 +223,11 @@ namespace mirror
 				size_t dataLength = 0u;
 				_dataBuffer->read(dataLength);
 				FDataBuffer instanceDataBuffer = FDataBuffer(_dataBuffer->data + _dataBuffer->cursor, dataLength);
-				for (const ClassMember& member : clss->getMembers())
+				std::vector<mirror::ClassMember*> members;
+				clss->getMembers(members);
+				for (const ClassMember* member : members)
 				{
-					_serializeEntry(&instanceDataBuffer, member.name, member.getInstanceMemberPointer(_object), member.type);
+					_serializeEntry(&instanceDataBuffer, member->getName(), member->getInstanceMemberPointer(_object), member->getType());
 				}
 				_dataBuffer->cursor += dataLength;
 			}
