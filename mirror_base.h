@@ -139,7 +139,8 @@ namespace mirror
 	{
 		static TypeDesc* Get()
 		{
-			static PointerTypeDesc s_pointerTypeDesc(TypeDescGetter<std::remove_pointer<T>::type>::Get()); return &s_pointerTypeDesc;
+			using remove_pointer_t = typename std::remove_pointer<T>::type;
+			static PointerTypeDesc s_pointerTypeDesc(TypeDescGetter<remove_pointer_t>::Get()); return &s_pointerTypeDesc;
 		}
 	};
 
@@ -192,7 +193,9 @@ namespace mirror
 	{
 		static bool Unpile(Class** _destClass, Class** _sourceClass)
 		{
-			return CastClassesUnpiler<std::remove_pointer<DestType>::type, std::remove_pointer<SourceType>::type>::Unpile(_destClass, _sourceClass);
+			using dest_t   = typename std::remove_pointer<DestType>::type;
+			using source_t = typename std::remove_pointer<SourceType>::type;
+			return CastClassesUnpiler<dest_t, source_t>::Unpile(_destClass, _sourceClass);
 		}
 	};
 
