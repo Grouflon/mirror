@@ -4,7 +4,7 @@
 #include <unordered_map>
 #include <vector>
 #include <set>
-#include <string.h>
+#include <string>
 #include <type_traits>
 #include <typeinfo>
 
@@ -139,23 +139,8 @@ namespace mirror
 	{
 		static TypeDesc* Get()
 		{
-			static PointerTypeDesc s_pointerTypeDesc(TypeDescGetter<std::remove_pointer<T>::type>::Get()); return &s_pointerTypeDesc;
-		}
-	};
-
-	template <typename T>
-	struct TypeDescGetter<T, void, std::enable_if_t<std::is_enum<T>::value>>
-	{
-		static TypeDesc* Get()
-		{
-			switch (sizeof(T))
-			{
-			case 1: return TypeDescGetter<int8_t>::Get();
-			case 2: return TypeDescGetter<int16_t>::Get();
-			case 4: return TypeDescGetter<int32_t>::Get();
-			case 8: return TypeDescGetter<int64_t>::Get();
-			}
-			return nullptr;
+			using type = typename std::remove_pointer<T>::type;
+			static PointerTypeDesc s_pointerTypeDesc(TypeDescGetter<type>::Get()); return &s_pointerTypeDesc;
 		}
 	};
 
@@ -174,6 +159,22 @@ namespace mirror
 	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double); return &s_typeDesc; } };
 
 	template <typename T>
+	struct TypeDescGetter<T, void, std::enable_if_t<std::is_enum<T>::value>>
+	{
+		static TypeDesc* Get()
+		{
+			switch (sizeof(T))
+			{
+			case 1: return TypeDescGetter<int8_t>::Get();
+			case 2: return TypeDescGetter<int16_t>::Get();
+			case 4: return TypeDescGetter<int32_t>::Get();
+			case 8: return TypeDescGetter<int64_t>::Get();
+			}
+			return nullptr;
+		}
+	};
+
+	template <typename T>
 	TypeDesc* GetTypeDesc(T) { return TypeDescGetter<T>::Get(); }
 
 	template <typename T>
@@ -190,29 +191,17 @@ namespace mirror
 	template <typename DestType, typename SourceType, typename IsDestLastPointer = void, typename IsSourceLastPointer = void>
 	struct CastClassesUnpiler
 	{
+		static_assert(!std::is_pointer<DestType>::value, "Mismatching pointer count between cast source and cast destination (DestType is not a pointer).");
+		static_assert(!std::is_pointer<SourceType>::value, "Mismatching pointer count between cast source and cast destination (SourceType is not a pointer).");
+
 		static bool Unpile(Class** _destClass, Class** _sourceClass)
 		{
-			return CastClassesUnpiler<std::remove_pointer<DestType>::type, std::remove_pointer<SourceType>::type>::Unpile(_destClass, _sourceClass);
+			using source_t = typename std::remove_pointer<SourceType>::type;
+			using dest_t   = typename std::remove_pointer<DestType>::type;
+			return CastClassesUnpiler<dest_t, source_t>::Unpile(_destClass, _sourceClass);
 		}
 	};
 
-	template <typename DestType, typename SourceType>
-	struct CastClassesUnpiler<DestType, SourceType, std::enable_if_t<std::is_pointer<DestType>::value>, std::enable_if_t<!std::is_pointer<SourceType>::value>>
-	{
-		static bool Unpile(Class** _destClass, Class** _sourceClass)
-		{
-			static_assert(false, "Mismatching pointer count between cast source and cast destination.");
-		}
-	};
-
-	template <typename DestType, typename SourceType>
-	struct CastClassesUnpiler<DestType, SourceType, std::enable_if_t<!std::is_pointer<DestType>::value>, std::enable_if_t<std::is_pointer<SourceType>::value>>
-	{
-		static bool Unpile(Class** _destClass, Class** _sourceClass)
-		{
-			static_assert(false, "Mismatching pointer count between cast source and cast destination.");
-		}
-	};
 
 	template <typename DestType, typename SourceType>
 	struct CastClassesUnpiler<DestType, SourceType, std::enable_if_t<!std::is_pointer<DestType>::value>, std::enable_if_t<!std::is_pointer<SourceType>::value>>

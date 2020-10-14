@@ -1,7 +1,7 @@
 #include "BinarySerializer.h"
 
 #include <cassert>
-
+#include <cstring>
 #include "../mirror.h"
 
 namespace mirror
