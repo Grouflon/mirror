@@ -1,4 +1,6 @@
 #include "mirror.h"
+#include "mirror_base.h"
+
 
 #include <cstring>
 #include <cassert>

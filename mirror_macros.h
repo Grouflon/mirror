@@ -2,6 +2,8 @@
 
 #include <mirror_base.h>
 
+#define MIRROR_FUNCTION(_function) mirror::CreateFunctionInstance(#_function, &_function)
+
 #define MIRROR_CLASS(_class, ...)\
 public:\
 	virtual mirror::Class* getClass() const { return _class::GetClass(); }\

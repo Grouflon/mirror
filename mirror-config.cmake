@@ -4,6 +4,7 @@
 # Declare the source files
 set(MIRROR_SOURCES
   "${CMAKE_CURRENT_LIST_DIR}/mirror_base.cpp"
+  "${CMAKE_CURRENT_LIST_DIR}/mirror_types.cpp"
   "${CMAKE_CURRENT_LIST_DIR}/tools/BinarySerializer.cpp"
 )
 
