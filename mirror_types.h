@@ -1,7 +1,5 @@
 #pragma once
 
-#include <string>
-
 namespace mirror
 {
 	enum Type
@@ -34,26 +32,8 @@ namespace mirror
 
 		Type_Pointer,
 
-		Type_Function,
+		Type_StaticFunction,
 
 		Type_COUNT,
 	};
-
-	/**
-	 * Provide some useful static methods to play with Type enum.
-	 */
-	namespace TypeHelper {
-	    /**
-	     * Given a Type, returns its native type as string.
-	     * @param t
-	     * @return
-	     */
-        const char *GetTypeName(Type t);
-
-        /* Templates to get the native type of a Type_ */
-        template <Type t> struct GetNative { using type = void; };
-        template <> struct GetNative<Type_bool> { using type = bool; };
-        template <> struct GetNative<Type_double> { using type = double; };
-        template <> struct GetNative<Type_std_string> { using type = std::string; };
-    }
 }

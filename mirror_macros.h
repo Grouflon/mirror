@@ -2,9 +2,6 @@
 
 #include <mirror_base.h>
 
-#define MIRROR_STATIC_FUNCTION(_function) mirror::DeclareStaticFunctionType(#_function, &_function)
-#define MIRROR_FUNCTION(_function) mirror::CreateFunctionInstance(#_function, &_function)
-
 #define MIRROR_CLASS(_class, ...)\
 public:\
 	virtual mirror::Class* getClass() const { return _class::GetClass(); }\
@@ -15,7 +12,7 @@ public:\
 		if (!s_class)\
 		{\
 			s_class = new mirror::Class(#_class, typeid(_class).hash_code());\
-			mirror::g_classSet.addClass(s_class);\
+			mirror::g_typeSet.addType(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
 			__MIRROR_CLASS_CONTENT
@@ -30,7 +27,7 @@ public:\
 		if (!s_class)\
 		{\
 			s_class = new mirror::Class(#_class, typeid(_class).hash_code());\
-			mirror::g_classSet.addClass(s_class);\
+			mirror::g_typeSet.addType(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
 			__MIRROR_CLASS_CONTENT
