@@ -2,6 +2,7 @@
 
 #include <mirror_base.h>
 
+#define MIRROR_STATIC_FUNCTION(_function) mirror::DeclareStaticFunctionType(#_function, &_function)
 #define MIRROR_FUNCTION(_function) mirror::CreateFunctionInstance(#_function, &_function)
 
 #define MIRROR_CLASS(_class, ...)\

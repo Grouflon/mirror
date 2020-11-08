@@ -1,7 +1,7 @@
 #include <cassert>
 #include "mirror_types.h"
 
-namespace mirror::TypeHelper {
+/*namespace mirror::TypeHelper {
 
     const char *GetTypeName(Type t) {
         switch (t) {
@@ -28,4 +28,4 @@ namespace mirror::TypeHelper {
         }
     }
 }
-
+*/

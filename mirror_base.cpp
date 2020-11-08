@@ -9,6 +9,7 @@
 namespace mirror
 {
 	ClassSet g_classSet;
+	std::unordered_map<size_t, StaticFunction*> g_functionsByTypeHash;
 
 	MetaData::MetaData(const char* _name, const char* _data)
 		: m_name(_name)

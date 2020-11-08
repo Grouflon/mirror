@@ -248,21 +248,38 @@ namespace mirror
 	template<typename F>
 	using function_arguments_t = typename function_traits<F>::args;
 
-
 	template <std::size_t N, typename F>
 	using function_argument_t = typename std::tuple_element<N, function_arguments_t<F>>::type;
 
-	template <typename T, T Begin,  class Func, T ...Is>
+	template <typename F, typename T, T I, T Top>
+	struct iterate_arguments
+	{
+		static void func(class StaticFunction* _function)
+		{
+			using ArgumentType = mirror::function_argument_t<I, F>;
+			_function->addArgument<ArgumentType>();
+			iterate_arguments<F, T, I + 1u, Top>::func(_function);
+		}
+	};
+
+	template <typename F, typename T, T I>
+	struct iterate_arguments<F, T, I, I>
+	{
+		static void func(class StaticFunction* _function) {}
+	};
+
+	/*template <typename T, T Begin,  class Func, T ...Is>
 	constexpr void static_for_impl( Func &&f, std::integer_sequence<T, Is...> )
 	{
-		( f( std::integral_constant<T, Begin + Is>{ } ),... );
+		f(std::integral_constant<T, );
+		//( f( std::integral_constant<T, Begin + Is>{ } ),... );
 	}
 
 	template <typename T, T Begin, T End, class Func >
-	constexpr void static_for( Func &&f )
+	constexpr void static_for( Func &&_f )
 	{
-		static_for_impl<T, Begin>( std::forward<Func>(f), std::make_integer_sequence<T, End - Begin>{ } );
-	}
+		static_for_impl<T, Begin>(std::forward<Func>(_f), std::make_integer_sequence<T, End - Begin>{});
+	}*/
 
 	template <class Tuple>
 	constexpr std::size_t tuple_size( const Tuple & )
@@ -315,18 +332,83 @@ namespace mirror
 
         constexpr size_t argCount = std::tuple_size<mirror::function_arguments_t<F>>::value;
 
-        mirror::static_for<std::size_t, 0, argCount>([&](auto eachArgIndex)
+        /*mirror::static_for<std::size_t, 0, argCount>([&](auto eachArgIndex)
                                                      {
                                                          using each_arg_T = mirror::function_argument_t<eachArgIndex, F>;
                                                          auto typeDesc = mirror::TypeDescGetter<each_arg_T>().Get();
                                                          newFunction->addArg(typeDesc);
-                                                     });
+                                                     });*/
 
         return newFunction;
     }
+
+	class StaticFunction : public TypeDesc
+	{
+	public:
+		StaticFunction(const char* _name, size_t _typeHash) :
+			TypeDesc(Type_Function),
+			m_name(_name),
+			m_typeHash(_typeHash)
+		{
+		}
+
+		template <typename T>
+		void setReturnType()
+		{
+			m_returnType = TypeDescGetter<T>::Get();
+		}
+
+		template <typename T>
+		void addArgument() {
+			TypeDesc* typeDesc = TypeDescGetter<T>::Get();
+			m_argumentTypes.push_back(typeDesc);
+		}
+
+	private:
+		size_t m_typeHash;
+		std::string m_name;
+		TypeDesc* m_returnType = nullptr;
+		std::vector<TypeDesc*> m_argumentTypes;
+	};
+
+	template <typename F>
+	static void DeclareStaticFunctionType(const char* _name, F* _function)
+	{
+		size_t typeHash = typeid(F).hash_code();
+		auto it = g_functionsByTypeHash.find(typeHash);
+		if (it == g_functionsByTypeHash.end())
+		{
+			StaticFunction* function = new StaticFunction(_name, typeHash);
+
+			// Return type
+			using ReturnType = typename mirror::function_traits<F*>::result;
+			function->setReturnType<ReturnType>();
+
+			// Arguments
+			constexpr size_t argumentsCount = std::tuple_size<mirror::function_arguments_t<F*>>::value;
+			mirror::iterate_arguments<F*, std::size_t, 0, argumentsCount>::func(function);
+
+			g_functionsByTypeHash.insert(std::make_pair(typeHash, function));
+		}
+	}
+
+	template <typename F>
+	static StaticFunction* GetStaticFunctionType(F* _function)
+	{
+		size_t typeHash = typeid(F).hash_code();
+		auto it = g_functionsByTypeHash.find(typeHash);
+		if (it != g_functionsByTypeHash.end())
+		{
+			return it->second;
+		}
+		return nullptr;
+	}
 
 	uint32_t Hash32(const void* _data, size_t _size);
 	uint32_t HashCString(const char* _str);
 
 	extern ClassSet	g_classSet;
+	extern std::unordered_map<size_t, StaticFunction*> g_functionsByTypeHash;
+
 }
+
