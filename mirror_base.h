@@ -7,6 +7,7 @@
 #include <string>
 #include <type_traits>
 #include <typeinfo>
+#include <assert.h>
 
 #include <mirror_types.h>
 
@@ -96,6 +97,7 @@ namespace mirror
 		virtual ~Class();
 
 		void getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers = true) const;
+		ClassMember* findMemberByName(const char* _name, bool _includeInheritedMembers = true) const;
 
 		const std::set<Class*>& getParents() const { return m_parents; }
 		const std::set<Class*>& getChildren() const { return m_children; }
@@ -109,6 +111,7 @@ namespace mirror
 		std::set<Class*> m_parents;
 		std::set<Class*> m_children;
 		std::vector<ClassMember*> m_members;
+		std::unordered_map<uint32_t, ClassMember*> m_membersByName;
 	};
 
 	class TypeSet
@@ -263,7 +266,7 @@ namespace mirror
 	{
 		static void Unpile(class StaticFunction* _function)
 		{
-			using ArgumentType = mirror::FunctionArgument_T<I, F>;
+			using ArgumentType = FunctionArgument_T<I, F>;
 			_function->addArgument<ArgumentType>();
 			FunctionArgumentsUnpiler<F, T, I + 1u, Top>::Unpile(_function);
 		}
@@ -274,6 +277,66 @@ namespace mirror
 	{
 		static void Unpile(class StaticFunction* _function) {}
 	};
+
+	template<typename F>
+	FunctionArguments_T<F> MakeFunctionArgumentsTuple(F _function)
+	{
+		return FunctionArguments_T<F>{};
+	}
+
+	template<typename Function, typename Tuple, size_t ... I>
+	auto CallFunction(Function f, Tuple t, std::index_sequence<I ...>)
+	{
+		return f(std::get<I>(t) ...);
+	}
+
+	template<typename Function, typename Tuple>
+	auto CallFunction(Function f, Tuple t)
+	{
+		static constexpr auto size = std::tuple_size<Tuple>::value;
+		return CallFunction(f, t, std::make_index_sequence<size>{});
+	}
+
+	template <size_t I, size_t Top>
+	struct FunctionArgumentsFiller
+	{
+		template <typename C, typename ...ArgumentsTypes>
+		static void Fill(C* _classInstance, const char** _memberNames, size_t _memberCount, std::tuple<ArgumentsTypes...>& _arguments)
+		{
+			using Argument_T = typename std::tuple_element<I, std::tuple<ArgumentsTypes...>>::type;
+
+			assert(_classInstance != nullptr);
+			Class* c = _classInstance->GetClass();
+			ClassMember* member = c->findMemberByName(_memberNames[I]);
+			assert(member != nullptr);
+			assert(member->getType() == TypeDescGetter<Argument_T>::Get());
+
+			std::get<I>(_arguments) = *reinterpret_cast<Argument_T*>(member->getInstanceMemberPointer(_classInstance));
+
+			FunctionArgumentsFiller<I + 1u, Top>::Fill(_classInstance, _memberNames, _memberCount, _arguments);
+		}
+	};
+
+	template <size_t I>
+	struct FunctionArgumentsFiller<I, I>
+	{
+		template <typename C, typename ...ArgumentsTypes>
+		static void Fill(C* _classInstance, const char** _memberNames, size_t _memberCount, std::tuple<ArgumentsTypes...>& _arguments)
+		{
+		}
+	};
+
+	template<typename F, typename C>
+	typename FunctionTraits<F>::result CallFunctionWithClassMembersAsArguments(F _functionPointer, C* _classInstance, const char** _memberNames, size_t _memberCount)
+	{
+		auto arguments = MakeFunctionArgumentsTuple(_functionPointer);
+
+		constexpr size_t argumentsCount = std::tuple_size<FunctionTraits<F>::args>::value;
+		assert(argumentsCount == _memberCount);
+		FunctionArgumentsFiller<0, argumentsCount>::Fill(_classInstance, _memberNames, _memberCount, arguments);
+
+		return CallFunction(&MyStaticFunction, arguments);
+	}
 
 	class StaticFunction : public TypeDesc
 	{
@@ -314,12 +377,12 @@ namespace mirror
 				using function_pointer_t = typename std::add_pointer<T>::type;
 
 				// Return type
-				using ReturnType = typename mirror::FunctionTraits<function_pointer_t>::result;
+				using ReturnType = typename FunctionTraits<function_pointer_t>::result;
 				s_staticFunction->setReturnType<ReturnType>();
 
 				// Arguments
-				constexpr size_t argumentsCount = std::tuple_size<mirror::FunctionArguments_T<function_pointer_t>>::value;
-				mirror::FunctionArgumentsUnpiler<function_pointer_t, std::size_t, 0, argumentsCount>::Unpile(s_staticFunction);
+				constexpr size_t argumentsCount = std::tuple_size<FunctionArguments_T<function_pointer_t>>::value;
+				FunctionArgumentsUnpiler<function_pointer_t, std::size_t, 0, argumentsCount>::Unpile(s_staticFunction);
 			}
 			return s_staticFunction;
 		}

@@ -197,6 +197,26 @@ namespace mirror
 		}
 	}
 
+	mirror::ClassMember* Class::findMemberByName(const char* _name, bool _includeInheritedMembers) const
+	{
+		uint32_t nameHash = HashCString(_name);
+		auto it = m_membersByName.find(nameHash);
+		if (it != m_membersByName.end())
+		{
+			return it->second;
+		}
+		if (_includeInheritedMembers)
+		{
+			for (Class* parent : m_parents)
+			{
+				ClassMember* member = parent->findMemberByName(_name);
+				if (member)
+					return member;
+			}
+		}
+		return nullptr;
+	}
+
 	bool Class::isChildOf(const Class* _class, bool _checkSelf) const
 	{
 		if (_class == this)
@@ -213,11 +233,12 @@ namespace mirror
 	{
 		assert(_member);
 		assert(std::find(m_members.begin(), m_members.end(), _member) == m_members.end());
-		// Checks if a member with the same name does not already exists
-		assert(std::find_if(m_members.begin(), m_members.end(), [_member](const ClassMember* _m) { return _member->m_name == _m->m_name; }) == m_members.end());
+		uint32_t nameHash = HashCString(_member->getName());
+		assert(m_membersByName.find(nameHash) == m_membersByName.end());
 
 		_member->m_class = this;
 		m_members.push_back(_member);
+		m_membersByName.insert(std::make_pair(nameHash, _member));
 	}
 
 	void Class::addParent(Class* _parent)
@@ -250,7 +271,6 @@ namespace mirror
 	{
 		// Checks if a type with the same typehash does not already exists
 		assert(_type);
-		uint32_t nameHash = HashCString(_type->getName());
 		assert(m_typesByTypeHash.find(_type->getTypeHash()) == m_typesByTypeHash.end());
 		assert(m_types.find(_type) == m_types.end());
 

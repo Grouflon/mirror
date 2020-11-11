@@ -16,7 +16,7 @@ namespace mirror
 		TypeDesc* getSubType() const { return m_subType; }
 
 	protected:
-		TypeDesc* m_subType;
+		TypeDesc* m_subType = nullptr;
 	};
 	template <typename T>
 	class TStdVectorTypeDesc : public StdVectorTypeDesc
