@@ -136,12 +136,7 @@ namespace mirror
 	{
 		static TypeDesc* Get()
 		{
-			static TypeDesc* s_typeDesc = nullptr;
-			if (s_typeDesc == nullptr)
-			{
-				s_typeDesc = g_typeSet.findTypeByTypeHash(typeid(T).hash_code());
-			}
-			return s_typeDesc;
+			return T::GetClass();
 		}
 	};
 
