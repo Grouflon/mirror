@@ -21,6 +21,8 @@ namespace mirror
 		Type_float,
 		Type_double,
 
+		Type_Enum,
+
 		Type_std_string,
 		Type_std_vector,
 

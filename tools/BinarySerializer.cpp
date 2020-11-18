@@ -168,6 +168,26 @@ namespace mirror
 		case Type_double:
 			_serialize<double>(_dataBuffer, _object);
 			break;
+		case Type_Enum:
+		{
+			const Enum* enumTypeDesc = static_cast<const Enum*>(_typeDesc);
+			int* valuePointer = static_cast<int*>(_object);
+			if (m_isWriting)
+			{
+				const char* str = "";
+				if (enumTypeDesc->getStringFromValue(*valuePointer, str))
+				{
+					size_t length = strlen(str);
+					_dataBuffer->write(str, length + 1);
+				}
+			}
+			else if (m_isReading)
+			{
+				char* str = reinterpret_cast<char*>(_dataBuffer->data + _dataBuffer->cursor);
+				enumTypeDesc->getValueFromString(str, *valuePointer);
+			}
+		}
+		break;
 		case Type_std_string:
 		{
 			std::string* stringPtr = reinterpret_cast<std::string*>(_object);

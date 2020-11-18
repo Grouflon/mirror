@@ -304,5 +304,73 @@ namespace mirror
 		
 	}
 
+	Enum::Enum(const char* _name, size_t _typeHash)
+		: TypeDesc(Type_Enum, _name, _typeHash)
+	{
+
+	}
+
+	bool Enum::getValueFromString(const char* _string, int& _outValue) const
+	{
+		if (_string == nullptr)
+			return false;
+
+		size_t hash = HashCString(_string);
+		auto it = m_valuesByNameHash.find(hash);
+		if (it != m_valuesByNameHash.end())
+		{
+			_outValue = it->second->getValue();
+			return true;
+		}
+		return false;
+	}
+
+	bool Enum::getStringFromValue(int _value, const char*& _outString) const
+	{
+		for (auto it = m_values.begin(); it != m_values.end(); ++it)
+		{
+			EnumValue* value = *it;
+			if (value->getValue() == _value)
+			{
+				_outString = value->getName();
+				return true;
+			}
+		}
+		return false;
+	}
+
+	const std::vector<EnumValue*>& Enum::getValues() const
+	{
+		return m_values;
+	}
+
+	void Enum::addValue(EnumValue* _value)
+	{
+		assert(_value != nullptr);
+		assert(std::find(m_values.begin(), m_values.end(), _value) == m_values.end());
+		size_t hash = HashCString(_value->getName());
+		assert(m_valuesByNameHash.find(hash) == m_valuesByNameHash.end());
+
+		m_values.push_back(_value);
+		m_valuesByNameHash.insert(std::make_pair(hash, _value));
+	}
+
+	EnumValue::EnumValue(const char* _name, int _value)
+		: m_name(_name)
+		, m_value(_value)
+	{
+
+	}
+
+	const char* EnumValue::getName() const
+	{
+		return m_name.c_str();
+	}
+
+	int EnumValue::getValue() const
+	{
+		return m_value;
+	}
+
 }
 

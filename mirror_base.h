@@ -114,6 +114,44 @@ namespace mirror
 		std::unordered_map<uint32_t, ClassMember*> m_membersByName;
 	};
 
+	class EnumValue
+	{
+	public:
+		EnumValue(const char* _name, int _value);
+		
+		const char* getName() const;
+		int getValue() const;
+
+	private:
+		std::string m_name;
+		int m_value;
+	};
+
+	class Enum : public TypeDesc
+	{
+	public:
+		Enum(const char* _name, size_t _typeHash);
+
+		bool getValueFromString(const char* _string, int& _outValue) const;
+		bool getStringFromValue(int _value, const char*& _outString) const;
+
+		const std::vector<EnumValue*>& getValues() const;
+		void addValue(EnumValue* _value);
+	private:
+		std::vector<EnumValue*> m_values;
+		std::unordered_map<size_t, EnumValue*> m_valuesByNameHash;
+	};
+
+	template<typename T>
+	Enum* GetEnum()
+	{
+		TypeDesc* type = TypeDescGetter<T>::Get();
+		if (type->getType() != Type_Enum)
+			return nullptr;
+
+		return static_cast<Enum*>(type);
+	}
+
 	class TypeSet
 	{
 	public:
@@ -330,7 +368,7 @@ namespace mirror
 		assert(argumentsCount == _memberCount);
 		FunctionArgumentsFiller<0, argumentsCount>::Fill(_classInstance, _memberNames, _memberCount, arguments);
 
-		return CallFunction(&MyStaticFunction, arguments);
+		return CallFunction(_functionPointer, arguments);
 	}
 
 	class StaticFunction : public TypeDesc

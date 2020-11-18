@@ -60,6 +60,20 @@ struct MyStruct
 		MIRROR_MEMBER(a)()
 	)
 };
+
+enum MyEnum
+{
+	MyEnum_1,
+	MyEnum_2,
+	MyEnum_3 = 5,
+};
+
+MIRROR_ENUM(MyEnum)
+(
+	MIRROR_ENUM_VALUE(MyEnum_1)()
+	MIRROR_ENUM_VALUE(MyEnum_2)()
+	MIRROR_ENUM_VALUE(MyEnum_3)()
+)
 ```
 
 ## How to use
@@ -67,6 +81,7 @@ struct MyStruct
 - Classes inheritance schemes can be checked at runtime by using the `Class::isChildOf` method.
 - A cheap dynamic cast is also available by using the static `mirror::Cast<TargetType>(SourceType)` method.
 - You can access a static function return and arguments types by calling `mirror::GetStaticFunctionType()` on a static function pointer.
+- You can access an enum type, convert value to string, string to value and access a list of the enum's values with the templated method `mirror::GetEnum<MyEnum>()`.
 
 ## Tools
 Mirror comes with a set of tools that works on reflected classes and can leverage the power of reflection.
