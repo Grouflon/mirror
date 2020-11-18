@@ -32,6 +32,8 @@ namespace mirror
 
 		Type_Pointer,
 
+		Type_StaticFunction,
+
 		Type_COUNT,
 	};
 }

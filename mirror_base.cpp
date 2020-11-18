@@ -1,4 +1,6 @@
 #include "mirror.h"
+#include "mirror_base.h"
+
 
 #include <cstring>
 #include <cassert>
@@ -6,7 +8,8 @@
 
 namespace mirror
 {
-	ClassSet g_classSet;
+	TypeSet g_typeSet;
+	std::unordered_map<size_t, StaticFunction*> g_functionsByTypeHash;
 
 	MetaData::MetaData(const char* _name, const char* _data)
 		: m_name(_name)
@@ -168,9 +171,7 @@ namespace mirror
 	}
 
 	Class::Class(const char* _name, size_t _typeHash)
-		: TypeDesc(Type_Class)
-		, m_typeHash(_typeHash)
-		, m_name(_name)
+		: TypeDesc(Type_Class, _name, _typeHash)
 	{
 
 	}
@@ -196,6 +197,26 @@ namespace mirror
 		}
 	}
 
+	mirror::ClassMember* Class::findMemberByName(const char* _name, bool _includeInheritedMembers) const
+	{
+		uint32_t nameHash = HashCString(_name);
+		auto it = m_membersByName.find(nameHash);
+		if (it != m_membersByName.end())
+		{
+			return it->second;
+		}
+		if (_includeInheritedMembers)
+		{
+			for (Class* parent : m_parents)
+			{
+				ClassMember* member = parent->findMemberByName(_name);
+				if (member)
+					return member;
+			}
+		}
+		return nullptr;
+	}
+
 	bool Class::isChildOf(const Class* _class, bool _checkSelf) const
 	{
 		if (_class == this)
@@ -212,11 +233,12 @@ namespace mirror
 	{
 		assert(_member);
 		assert(std::find(m_members.begin(), m_members.end(), _member) == m_members.end());
-		// Checks if a member with the same name does not already exists
-		assert(std::find_if(m_members.begin(), m_members.end(), [_member](const ClassMember* _m) { return _member->m_name == _m->m_name; }) == m_members.end());
+		uint32_t nameHash = HashCString(_member->getName());
+		assert(m_membersByName.find(nameHash) == m_membersByName.end());
 
 		_member->m_class = this;
 		m_members.push_back(_member);
+		m_membersByName.insert(std::make_pair(nameHash, _member));
 	}
 
 	void Class::addParent(Class* _parent)
@@ -229,67 +251,54 @@ namespace mirror
 		_parent->m_children.insert(this);
 	}
 
-	ClassSet::~ClassSet()
+	TypeSet::~TypeSet()
 	{
-		for (auto& pair : m_classesByNameHash)
+		for (TypeDesc* type : m_types)
 		{
-			delete pair.second;
+			delete type;
 		}
-		m_classesByNameHash.clear();
-		m_classesByTypeHash.clear();
+		m_types.clear();
+		m_typesByTypeHash.clear();
 	}
 
-	mirror::Class* ClassSet::findClassByName(const char* _className)
+	TypeDesc* TypeSet::findTypeByTypeHash(size_t _typeHash)
 	{
-		auto it = m_classesByNameHash.find(HashCString(_className));
-		return it != m_classesByNameHash.end() ? it->second : nullptr;
+		auto it = m_typesByTypeHash.find(_typeHash);
+		return it != m_typesByTypeHash.end() ? it->second : nullptr;
 	}
 
-	Class* ClassSet::findClassByTypeHash(size_t _classTypeHash)
+	void TypeSet::addType(TypeDesc* _type)
 	{
-		auto it = m_classesByTypeHash.find(_classTypeHash);
-		return it != m_classesByTypeHash.end() ? it->second : nullptr;
+		// Checks if a type with the same typehash does not already exists
+		assert(_type);
+		assert(m_typesByTypeHash.find(_type->getTypeHash()) == m_typesByTypeHash.end());
+		assert(m_types.find(_type) == m_types.end());
+
+		m_typesByTypeHash.insert(std::make_pair(_type->getTypeHash(), _type));
+		m_types.emplace(_type);
 	}
 
-	void ClassSet::addClass(Class* _class)
+	void TypeSet::removeType(TypeDesc* _type)
 	{
-		// Checks if a class with the same name/typehash does not already exists
-		assert(_class);
-		uint32_t nameHash = HashCString(_class->getName());
-		assert(m_classesByNameHash.find(nameHash) == m_classesByNameHash.end());
-		assert(m_classesByTypeHash.find(_class->getTypeHash()) == m_classesByTypeHash.end());
-		assert(m_classes.find(_class) == m_classes.end());
+		assert(_type);
 
-		m_classesByNameHash.insert(std::make_pair(nameHash, _class));
-		m_classesByTypeHash.insert(std::make_pair(_class->getTypeHash(), _class));
-		m_classes.emplace(_class);
+		// Checks if a type with the same typehash already exists
+		auto it = m_typesByTypeHash.find(_type->getTypeHash());
+		assert(it != m_typesByTypeHash.end());
+		m_typesByTypeHash.erase(it);
+
+		auto it2 = m_types.find(_type);
+		assert(it2 != m_types.end());
+		m_types.erase(it2);
 	}
 
-	void ClassSet::removeClass(Class* _class)
+	const std::set<TypeDesc*>& TypeSet::GetTypes() const
 	{
-		assert(_class);
-
-		// Checks if a class with the same name/typehash already exists
-		auto it = m_classesByNameHash.find(HashCString(_class->getName()));
-		assert(it != m_classesByNameHash.end());
-		m_classesByNameHash.erase(it);
-
-		auto it2 = m_classesByTypeHash.find(_class->getTypeHash());
-		assert(it2 != m_classesByTypeHash.end());
-		m_classesByTypeHash.erase(it2);
-
-		auto it3 = m_classes.find(_class);
-		assert(it3 != m_classes.end());
-		m_classes.erase(it3);
+		return m_types;
 	}
 
-	const std::set<Class*>& ClassSet::GetClasses() const
-	{
-		return m_classes;
-	}
-
-	PointerTypeDesc::PointerTypeDesc(TypeDesc* _subType)
-		: TypeDesc(Type_Pointer)
+	PointerTypeDesc::PointerTypeDesc(size_t _typeHash, TypeDesc* _subType)
+		: TypeDesc(Type_Pointer, "pointer", _typeHash)
 		, m_subType(_subType)
 	{
 		

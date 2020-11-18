@@ -25,16 +25,6 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 - Here is an example declaration:
 
 ```C++
-struct MyStruct
-{
-	int a;
-
-	MIRROR_CLASS(MyStruct)
-	(
-		MIRROR_MEMBER(a)()
-	)
-};
-
 class MyClass : public MyParent
 {
 	bool a;
@@ -44,6 +34,7 @@ class MyClass : public MyParent
 	std::vector<std::vector<std::string>> e;
 	std::string f;
 	Enum g;
+	bool (*e)(int, float, char*);
 
 	MIRROR_CLASS(MyClass)
 	(
@@ -56,14 +47,26 @@ class MyClass : public MyParent
 		MIRROR_MEMBER(e)()
 		MIRROR_MEMBER(f)(Deprecated)
 		MIRROR_MEMBER(g)()
+		MIRROR_MEMBER(e)()
+	)
+};
+
+struct MyStruct
+{
+	int a;
+
+	MIRROR_CLASS_NOVIRTUAL(MyStruct) // Declare your classes that way if you don't want to make it virtual
+	(
+		MIRROR_MEMBER(a)()
 	)
 };
 ```
 
 ## How to use
-- Any reflected class gains a public `GetClass()` static function that allow to iterate through reflected members, access their types and find their address on given instances.
+- Any reflected class gains a public `GetClass()` static function that allow to iterate through reflected members, access their types and find their address on given instances. You can also access it from the oustide with the function `mirror::GetClass<T>()`
 - Classes inheritance schemes can be checked at runtime by using the `Class::isChildOf` method.
 - A cheap dynamic cast is also available by using the static `mirror::Cast<TargetType>(SourceType)` method.
+- You can access a static function return and arguments types by calling `mirror::GetStaticFunctionType()` on a static function pointer.
 
 ## Tools
 Mirror comes with a set of tools that works on reflected classes and can leverage the power of reflection.
