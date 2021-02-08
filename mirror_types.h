@@ -26,10 +26,6 @@ namespace mirror
 		Type_std_string,
 		Type_std_vector,
 
-		/*Type_c_string,
-		Type_c_fixedArray,
-		Type_c_dynamicArray,*/
-
 		Type_Class,
 
 		Type_Pointer,

@@ -117,29 +117,63 @@ namespace mirror
 	class EnumValue
 	{
 	public:
-		EnumValue(const char* _name, int _value);
+		EnumValue(const char* _name, int64_t _value);
 		
 		const char* getName() const;
-		int getValue() const;
+		int64_t getValue() const;
 
 	private:
 		std::string m_name;
-		int m_value;
+		int64_t m_value;
 	};
 
 	class Enum : public TypeDesc
 	{
 	public:
-		Enum(const char* _name, size_t _typeHash);
+		Enum(const char* _name, size_t _typeHash, TypeDesc* _subType = nullptr);
 
-		bool getValueFromString(const char* _string, int& _outValue) const;
-		bool getStringFromValue(int _value, const char*& _outString) const;
+		template <typename T>
+		bool getValueFromString(const char* _string, T& _outValue) const
+		{
+			if (_string == nullptr)
+				return false;
+
+			size_t hash = HashCString(_string);
+			auto it = m_valuesByNameHash.find(hash);
+			if (it != m_valuesByNameHash.end())
+			{
+				_outValue = static_cast<T>(it->second->getValue());
+				return true;
+			}
+			return false;
+		}
+
+		template <typename T>
+		bool getStringFromValue(T _value, const char*& _outString) const
+		{
+			int64_t value = static_cast<int64_t>(_value);
+			for (auto it = m_values.begin(); it != m_values.end(); ++it)
+			{
+				EnumValue* enumValue = *it;
+				if (enumValue->getValue() == value)
+				{
+					_outString = enumValue->getName();
+					return true;
+				}
+			}
+			return false;
+		}
 
 		const std::vector<EnumValue*>& getValues() const;
 		void addValue(EnumValue* _value);
+
+		TypeDesc* getSubType() const { return m_subType; }
+
 	private:
 		std::vector<EnumValue*> m_values;
 		std::unordered_map<size_t, EnumValue*> m_valuesByNameHash;
+
+		TypeDesc* m_subType;
 	};
 
 	template<typename T>
@@ -162,7 +196,7 @@ namespace mirror
 		void addType(TypeDesc* _type);
 		void removeType(TypeDesc* _type);
 
-		const std::set<TypeDesc*>& GetTypes() const;
+		const std::set<TypeDesc*>& getTypes() const;
 
 	private:
 		std::set<TypeDesc*> m_types;

@@ -65,16 +65,36 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 		s_enum = new ::mirror::Enum(#_enumName, typeid(_enumName).hash_code()); \
 		__MIRROR_ENUM_CONTENT
 
+#define MIRROR_ENUM_VALUE(_enumValue)\
+		s_enum->addValue(new ::mirror::EnumValue(#_enumValue, _enumValue));\
+		_MIRROR_ENUM_VALUE_CONTENT
+
+#define MIRROR_ENUM_CLASS(_enumName)\
+template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDesc* Get() { \
+	using enumType = _enumName; \
+	static ::mirror::Enum* s_enum = nullptr; \
+	if (s_enum == nullptr) \
+	{ \
+		TypeDesc* subType; \
+		switch(sizeof(_enumName)) { \
+			case 1: subType = ::mirror::TypeDescGetter<int8_t>::Get(); break; \
+			case 2: subType = ::mirror::TypeDescGetter<int16_t>::Get(); break; \
+			case 4: subType = ::mirror::TypeDescGetter<int32_t>::Get(); break; \
+			case 8: subType = ::mirror::TypeDescGetter<int64_t>::Get(); break; \
+		} \
+		s_enum = new ::mirror::Enum(#_enumName, typeid(_enumName).hash_code(), subType); \
+		__MIRROR_ENUM_CONTENT
+
+#define MIRROR_ENUM_CLASS_VALUE(_enumValue)\
+		s_enum->addValue(new ::mirror::EnumValue(#_enumValue, int64_t(enumType::_enumValue)));\
+		_MIRROR_ENUM_VALUE_CONTENT
+
 #define __MIRROR_ENUM_CONTENT(...)\
 		__VA_ARGS__\
 		g_typeSet.addType(s_enum);\
 	}\
 	return s_enum;\
 }};
-
-#define MIRROR_ENUM_VALUE(_memberName)\
-		s_enum->addValue(new ::mirror::EnumValue(#_memberName, _memberName));\
-		_MIRROR_ENUM_VALUE_CONTENT
 
 #define _MIRROR_ENUM_VALUE_CONTENT(...)
 

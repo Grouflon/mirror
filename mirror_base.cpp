@@ -292,7 +292,7 @@ namespace mirror
 		m_types.erase(it2);
 	}
 
-	const std::set<TypeDesc*>& TypeSet::GetTypes() const
+	const std::set<TypeDesc*>& TypeSet::getTypes() const
 	{
 		return m_types;
 	}
@@ -304,39 +304,11 @@ namespace mirror
 		
 	}
 
-	Enum::Enum(const char* _name, size_t _typeHash)
+	Enum::Enum(const char* _name, size_t _typeHash, TypeDesc* _subType)
 		: TypeDesc(Type_Enum, _name, _typeHash)
+		, m_subType(_subType ? _subType : TypeDescGetter<int>::Get())
 	{
 
-	}
-
-	bool Enum::getValueFromString(const char* _string, int& _outValue) const
-	{
-		if (_string == nullptr)
-			return false;
-
-		size_t hash = HashCString(_string);
-		auto it = m_valuesByNameHash.find(hash);
-		if (it != m_valuesByNameHash.end())
-		{
-			_outValue = it->second->getValue();
-			return true;
-		}
-		return false;
-	}
-
-	bool Enum::getStringFromValue(int _value, const char*& _outString) const
-	{
-		for (auto it = m_values.begin(); it != m_values.end(); ++it)
-		{
-			EnumValue* value = *it;
-			if (value->getValue() == _value)
-			{
-				_outString = value->getName();
-				return true;
-			}
-		}
-		return false;
 	}
 
 	const std::vector<EnumValue*>& Enum::getValues() const
@@ -355,7 +327,7 @@ namespace mirror
 		m_valuesByNameHash.insert(std::make_pair(hash, _value));
 	}
 
-	EnumValue::EnumValue(const char* _name, int _value)
+	EnumValue::EnumValue(const char* _name, int64_t _value)
 		: m_name(_name)
 		, m_value(_value)
 	{
@@ -367,7 +339,7 @@ namespace mirror
 		return m_name.c_str();
 	}
 
-	int EnumValue::getValue() const
+	int64_t EnumValue::getValue() const
 	{
 		return m_value;
 	}
