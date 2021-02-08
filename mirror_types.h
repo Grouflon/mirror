@@ -29,6 +29,7 @@ namespace mirror
 		Type_Class,
 
 		Type_Pointer,
+		Type_FixedSizeArray,
 
 		Type_StaticFunction,
 

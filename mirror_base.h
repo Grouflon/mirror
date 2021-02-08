@@ -65,6 +65,19 @@ namespace mirror
 		TypeDesc* m_subType;
 	};
 
+	class FixedSizeArrayTypeDesc : public TypeDesc
+	{
+	public:
+		FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _size);
+
+		TypeDesc* getSubType() const { return m_subType; }
+		size_t getSize() const { return m_size; }
+
+	private:
+		TypeDesc* m_subType;
+		size_t m_size;
+	};
+
 	class ClassMember
 	{
 		friend class Class;
@@ -203,7 +216,7 @@ namespace mirror
 		std::unordered_map<size_t, TypeDesc*> m_typesByTypeHash;
 	};
 
-	template <typename T, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
+	template <typename T, typename IsArray = void, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
 	struct TypeDescGetter
 	{
 		static TypeDesc* Get()
@@ -213,7 +226,18 @@ namespace mirror
 	};
 
 	template <typename T>
-	struct TypeDescGetter<T, std::enable_if_t<std::is_pointer<T>::value>>
+	struct TypeDescGetter<T, std::enable_if_t<std::is_array<T>::value>>
+	{
+		static TypeDesc* Get()
+		{
+			using type = typename typename std::remove_extent<T>::type;
+			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get(), std::extent<T>::value);
+			return &s_fixedSizeArrayTypeDesc;
+		}
+	};
+
+	template <typename T>
+	struct TypeDescGetter<T, void, std::enable_if_t<std::is_pointer<T>::value>>
 	{
 		static TypeDesc* Get()
 		{
@@ -238,7 +262,7 @@ namespace mirror
 	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double, "double", typeid(double).hash_code()); return &s_typeDesc; } };
 
 	template <typename T>
-	struct TypeDescGetter<T, void, std::enable_if_t<std::is_enum<T>::value>>
+	struct TypeDescGetter<T, void, void, std::enable_if_t<std::is_enum<T>::value>>
 	{
 		static TypeDesc* Get()
 		{
@@ -254,7 +278,7 @@ namespace mirror
 	};
 
 	template <typename T>
-	TypeDesc* GetTypeDesc(T) { return TypeDescGetter<T>::Get(); }
+	TypeDesc* GetTypeDesc(T&) { return TypeDescGetter<T>::Get(); }
 
 	template <typename T>
 	Class* GetClass()
@@ -431,7 +455,7 @@ namespace mirror
 	};
 
 	template <typename T>
-	struct TypeDescGetter<T, void, void, std::enable_if_t<std::is_function<T>::value>>
+	struct TypeDescGetter<T, void, void, void, std::enable_if_t<std::is_function<T>::value>>
 	{
 		static TypeDesc* Get()
 		{

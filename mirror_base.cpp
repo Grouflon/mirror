@@ -304,6 +304,14 @@ namespace mirror
 		
 	}
 
+	FixedSizeArrayTypeDesc::FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _size)
+		: TypeDesc(Type_FixedSizeArray, "fixed_size_array", _typeHash)
+		, m_subType(_subType)
+		, m_size(_size)
+	{
+
+	}
+
 	Enum::Enum(const char* _name, size_t _typeHash, TypeDesc* _subType)
 		: TypeDesc(Type_Enum, _name, _typeHash)
 		, m_subType(_subType ? _subType : TypeDescGetter<int>::Get())
