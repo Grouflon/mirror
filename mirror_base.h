@@ -15,6 +15,7 @@ namespace mirror
 {
 	class Class;
 	class TypeDesc;
+	typedef void* (*FactoryFunctionPtr)();
 
 	struct MetaData
 	{
@@ -32,13 +33,26 @@ namespace mirror
 		std::string m_data;
 	};
 
+	struct MetaDataSet
+	{
+		MetaDataSet(const char* _metaDataString);
+		const MetaData* findMetaData(const char* _key) const;
+
+	private:
+		std::unordered_map<uint32_t, MetaData> m_metaData;
+	};
+
+	template <typename T> void* SimpleFactory() { return new T; }
+
 	class TypeDesc
 	{
 	public:
-		TypeDesc(Type _type, const char* _name, size_t _typeHash)
+		TypeDesc(Type _type, const char* _name, size_t _typeHash, size_t _size, FactoryFunctionPtr _factory = nullptr)
 			: m_type(_type)
 			, m_name(_name)
 			, m_typeHash(_typeHash)
+			, m_size(_size)
+			, m_factory(_factory)
 		{}
 
 		// NOTE(Remi|2020/04/26): virtual specifier is not needed, but is added to allow the debugger to show inherited types
@@ -47,17 +61,25 @@ namespace mirror
 		Type getType() const { return m_type; }
 		const char* getName() const { return m_name.c_str(); }
 		size_t getTypeHash() const { return m_typeHash; }
+		size_t getSize() const { return m_size; }
+
+		// @TODO(2021/02/15|Remi): Allow the user to choose their allocator
+		void setFactory(FactoryFunctionPtr _factory);
+		bool hasFactory() const;
+		void* instantiate() const;
 
 	private:
 		Type m_type = Type_none;
 		std::string m_name;
 		size_t m_typeHash = 0;
+		size_t m_size = 0;
+		FactoryFunctionPtr m_factory = nullptr;
 	};
 
 	class PointerTypeDesc : public TypeDesc
 	{
 	public:
-		PointerTypeDesc(size_t _typeHash, TypeDesc* _subType);
+		PointerTypeDesc(size_t _typeHash, TypeDesc* _subType, FactoryFunctionPtr _factory = nullptr);
 
 		TypeDesc* getSubType() const { return m_subType; }
 
@@ -68,14 +90,14 @@ namespace mirror
 	class FixedSizeArrayTypeDesc : public TypeDesc
 	{
 	public:
-		FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _size);
+		FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _elementCount, size_t _size);
 
 		TypeDesc* getSubType() const { return m_subType; }
-		size_t getSize() const { return m_size; }
+		size_t getElementCount() const { return m_elementCount; }
 
 	private:
 		TypeDesc* m_subType;
-		size_t m_size;
+		size_t m_elementCount;
 	};
 
 	class ClassMember
@@ -91,22 +113,20 @@ namespace mirror
 		TypeDesc* getType() const { return m_type; }
 
 		void* getInstanceMemberPointer(void* _classInstancePointer) const;
-
-		MetaData* getMetaData(const char* _key) const;
+		const MetaDataSet& GetMetaDataSet() const { return m_metaDataSet; }
 
 	private:
 		Class* m_class = nullptr;
 		std::string m_name;
 		size_t m_offset;
 		TypeDesc* m_type = nullptr;
-		std::unordered_map<uint32_t, MetaData> m_metaData;
+		MetaDataSet m_metaDataSet;
 	};
-
 
 	class Class : public TypeDesc
 	{
 	public:
-		Class(const char* _name, size_t _typeHash);
+		Class(const char* _name, size_t _typeHash, size_t _size);
 		virtual ~Class();
 
 		void getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers = true) const;
@@ -231,7 +251,7 @@ namespace mirror
 		static TypeDesc* Get()
 		{
 			using type = typename typename std::remove_extent<T>::type;
-			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get(), std::extent<T>::value);
+			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get(), std::extent<T>::value, sizeof(T));
 			return &s_fixedSizeArrayTypeDesc;
 		}
 	};
@@ -242,24 +262,25 @@ namespace mirror
 		static TypeDesc* Get()
 		{
 			using type = typename std::remove_pointer<T>::type;
-			static PointerTypeDesc s_pointerTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get());
+			static auto s_factory = []() -> void* { return new T(); };
+			static PointerTypeDesc s_pointerTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get(), s_factory);
 			return &s_pointerTypeDesc;
 		}
 	};
 
-	template <> struct TypeDescGetter<void> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_void, "void", typeid(void).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<bool> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_bool, "bool", typeid(bool).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<char> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_char, "char", typeid(char).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int8, "int8", typeid(int8_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int16, "int16", typeid(int16_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int32, "int32", typeid(int32_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int64, "int64", typeid(int64_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint8, "uint8", typeid(uint8_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint16, "uint16", typeid(uint16_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint32, "uint32", typeid(uint32_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint64, "uint64", typeid(uint64_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<float> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_float, "float", typeid(float).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double, "double", typeid(double).hash_code()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<void> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_void, "void", typeid(void).hash_code(), 0, nullptr); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<bool> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_bool, "bool", typeid(bool).hash_code(), sizeof(bool), &SimpleFactory<bool>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<char> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_char, "char", typeid(char).hash_code(), sizeof(char), &SimpleFactory<char>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int8, "int8", typeid(int8_t).hash_code(), sizeof(int8_t), &SimpleFactory<int8_t>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int16, "int16", typeid(int16_t).hash_code(), sizeof(int16_t), &SimpleFactory<int16_t>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int32, "int32", typeid(int32_t).hash_code(), sizeof(int32_t), &SimpleFactory<int32_t>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int64, "int64", typeid(int64_t).hash_code(), sizeof(int64_t), &SimpleFactory<int64_t>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint8, "uint8", typeid(uint8_t).hash_code(), sizeof(uint8_t), &SimpleFactory<uint8_t>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint16, "uint16", typeid(uint16_t).hash_code(), sizeof(uint16_t), &SimpleFactory<uint16_t>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint32, "uint32", typeid(uint32_t).hash_code(), sizeof(uint32_t), &SimpleFactory<uint32_t>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint64, "uint64", typeid(uint64_t).hash_code(), sizeof(uint64_t), &SimpleFactory<uint64_t>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<float> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_float, "float", typeid(float).hash_code(), sizeof(float), &SimpleFactory<float>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double, "double", typeid(double).hash_code(), sizeof(double), &SimpleFactory<double>); return &s_typeDesc; } };
 
 	template <typename T>
 	struct TypeDescGetter<T, void, void, std::enable_if_t<std::is_enum<T>::value>>
@@ -276,6 +297,9 @@ namespace mirror
 			return nullptr;
 		}
 	};
+
+	template <typename T>
+	TypeDesc* GetTypeDesc() { return TypeDescGetter<T>::Get(); }
 
 	template <typename T>
 	TypeDesc* GetTypeDesc(T&) { return TypeDescGetter<T>::Get(); }
@@ -433,7 +457,7 @@ namespace mirror
 	{
 	public:
 		StaticFunction(size_t _typeHash)
-			: TypeDesc(Type_StaticFunction, "StaticFunction", _typeHash)
+			: TypeDesc(Type_StaticFunction, "StaticFunction", _typeHash, sizeof(void*))
 		{
 		}
 

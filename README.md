@@ -3,8 +3,9 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 
 ## Manifesto (enforced in this framework, but actually applies to any coding project)
 - Simple ideas should be simple to write.
+- If you are not using it, it should not do anything.
 - Redundant declaration is evil and should be avoided at all cost.
-- A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2020.
+- A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2021.
 
 ## How to install
 ### Using CMAKE
@@ -13,7 +14,7 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 - Add `${MIRROR_INCLUDE_DIRS}` to your target include folders list.
 
 ### Manually
-- Compile mirror.cpp alongside your project
+- Compile mirror_base.cpp,  alongside your project
 - (Optional) Also compile the source files of the tools you intend to use from the "Tools" folder
 
 ## How to declare
@@ -39,6 +40,8 @@ class MyClass : public MyParent
 	MIRROR_CLASS(MyClass)
 	(
 		MIRROR_PARENT(MyParent)
+
+		MIRROR_FACTORY() // Declare a factory that will be able to call the no parameter constructor directly from the Class `instantiate()` method
 
 		MIRROR_MEMBER(a)()
 		MIRROR_MEMBER(b)(Transient)

@@ -8,10 +8,11 @@ public:\
 	\
 	static ::mirror::Class* GetClass()\
 	{\
+		using classType = _class; \
 		static ::mirror::Class* s_class = nullptr;\
 		if (!s_class)\
 		{\
-			s_class = new ::mirror::Class(#_class, typeid(_class).hash_code());\
+			s_class = new ::mirror::Class(#_class, typeid(_class).hash_code(), sizeof(_class));\
 			::mirror::g_typeSet.addType(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
@@ -23,10 +24,11 @@ public:\
 	\
 	static ::mirror::Class* GetClass()\
 	{\
+		using classType = _class; \
 		static ::mirror::Class* s_class = nullptr;\
 		if (!s_class)\
 		{\
-			s_class = new ::mirror::Class(#_class, typeid(_class).hash_code());\
+			s_class = new ::mirror::Class(#_class, typeid(_class).hash_code(), sizeof(_class));\
 			::mirror::g_typeSet.addType(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
@@ -55,6 +57,12 @@ public:\
 	{\
 		s_class->addParent(::mirror::GetClass<_parentClass>());\
 	}
+
+// @NOTE(2021/02/15|Remi): Wrapping this code into curly brackets throw out a compilation error, I don't get why.
+// Not a big deal since so far we only need one but still...
+#define MIRROR_FACTORY()\
+	static auto s_factory = []() -> void* { return new classType(); };\
+	s_class->setFactory(s_factory);
 
 
 #define MIRROR_ENUM(_enumName)\
@@ -97,7 +105,3 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 }};
 
 #define _MIRROR_ENUM_VALUE_CONTENT(...)
-
-/*#define MIRROR_MEMBER_CSTRING()
-#define MIRROR_MEMBER_CFIXEDARRAY()
-#define MIRROR_MEMBER_CDYNAMICARRAY()*/

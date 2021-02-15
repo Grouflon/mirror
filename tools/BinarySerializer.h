@@ -9,7 +9,9 @@ namespace mirror
 {
 	class Class;
 	class TypeDesc;
+	struct MetaDataSet; 
 	class StdVectorTypeDescBase;
+	
 
 	class BinarySerializer
 	{
@@ -73,8 +75,8 @@ namespace mirror
 			void reserve(size_t _size);
 		};
 
-		void _serializeEntry(FDataBuffer* _dataBuffer, const char* _id, void* _object, const TypeDesc* _typeDesc);
-		void _serialize(FDataBuffer* _dataBuffer, void* _object, const TypeDesc* _typeDesc);
+		void _serializeEntry(FDataBuffer* _dataBuffer, const char* _id, void* _object, const TypeDesc* _typeDesc, const MetaDataSet* _metaDataSet = nullptr);
+		void _serialize(FDataBuffer* _dataBuffer, void* _object, const TypeDesc* _typeDesc, const MetaDataSet* _metaDataSet = nullptr);
 		template <typename T>
 		void _serialize(FDataBuffer* _dataBuffer, void* _object)
 		{

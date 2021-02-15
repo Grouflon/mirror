@@ -8,40 +8,8 @@
 
 namespace mirror
 {
-	TypeSet g_typeSet;
-	std::unordered_map<size_t, StaticFunction*> g_functionsByTypeHash;
 
-	MetaData::MetaData(const char* _name, const char* _data)
-		: m_name(_name)
-		, m_data(_data)
-	{
-
-	}
-
-	const char* MetaData::getName() const
-	{
-		return m_name.c_str();
-	}
-
-	bool MetaData::asBool() const
-	{
-		return false;
-	}
-
-	int MetaData::asInt() const
-	{
-		return 0;
-	}
-
-	float MetaData::asFloat() const
-	{
-		return 0.f;
-	}
-
-	const char* MetaData::asString() const
-	{
-		return m_data.c_str();
-	}
+// ------------- TOOLS -----------------
 
 #define OFFSET_BASIS	2166136261
 #define FNV_PRIME		16777619
@@ -71,7 +39,7 @@ namespace mirror
 		return Hash32(_str, strlen(_str));
 	}
 
-	void sanitizeMetaDataString(char* _buf)
+	void SanitizeMetaDataString(char* _buf)
 	{
 		assert(_buf);
 
@@ -92,7 +60,7 @@ namespace mirror
 				{
 					lastChar = cur + 1;
 				}
-				
+
 			}
 		}
 
@@ -101,10 +69,44 @@ namespace mirror
 		_buf[len] = 0;
 	}
 
-	ClassMember::ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString)
+// ------------- !TOOLS -----------------
+
+	TypeSet g_typeSet;
+	std::unordered_map<size_t, StaticFunction*> g_functionsByTypeHash;
+
+	MetaData::MetaData(const char* _name, const char* _data)
 		: m_name(_name)
-		, m_offset(_offset)
-		, m_type(_type)
+		, m_data(_data)
+	{
+		
+	}
+
+	const char* MetaData::getName() const
+	{
+		return m_name.c_str();
+	}
+
+	bool MetaData::asBool() const
+	{
+		return false;
+	}
+
+	int MetaData::asInt() const
+	{
+		return 0;
+	}
+
+	float MetaData::asFloat() const
+	{
+		return 0.f;
+	}
+
+	const char* MetaData::asString() const
+	{
+		return m_data.c_str();
+	}
+
+	MetaDataSet::MetaDataSet(const char* _metaDataString)
 	{
 		// Parse meta data
 		assert(_metaDataString);
@@ -144,8 +146,8 @@ namespace mirror
 				}
 				valueBuf[valueLen] = 0;
 
-				sanitizeMetaDataString(keyBuf);
-				sanitizeMetaDataString(valueBuf);
+				SanitizeMetaDataString(keyBuf);
+				SanitizeMetaDataString(valueBuf);
 
 				MetaData metaData(keyBuf, valueBuf);
 				m_metaData.insert(std::make_pair(HashCString(metaData.getName()), metaData));
@@ -160,18 +162,54 @@ namespace mirror
 		}
 	}
 
+	const mirror::MetaData* MetaDataSet::findMetaData(const char* _key) const
+	{
+		if (_key == nullptr)
+			return nullptr;
+
+		uint32_t hash = HashCString(_key);
+		auto it = m_metaData.find(hash);
+		if (it == m_metaData.end())
+			return nullptr;
+
+		return &it->second;
+	}
+
+	void TypeDesc::setFactory(FactoryFunctionPtr _factory)
+	{
+		m_factory = _factory;
+	}
+
+	bool TypeDesc::hasFactory() const
+	{
+		return m_factory != nullptr;
+	}
+
+	void* TypeDesc::instantiate() const
+	{
+		if (m_factory != nullptr)
+		{
+			return m_factory();
+		}
+		return nullptr;
+	}
+
+	ClassMember::ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString)
+		: m_name(_name)
+		, m_offset(_offset)
+		, m_type(_type)
+		, m_metaDataSet(_metaDataString)
+	{
+
+	}
+
 	void* ClassMember::getInstanceMemberPointer(void* _classInstancePointer) const
 	{
 		return reinterpret_cast<uint8_t*>(_classInstancePointer) + m_offset;
 	}
 
-	mirror::MetaData* ClassMember::getMetaData(const char* _key) const
-	{
-		return nullptr;
-	}
-
-	Class::Class(const char* _name, size_t _typeHash)
-		: TypeDesc(Type_Class, _name, _typeHash)
+	Class::Class(const char* _name, size_t _typeHash, size_t _size)
+		: TypeDesc(Type_Class, _name, _typeHash, _size)
 	{
 
 	}
@@ -297,23 +335,23 @@ namespace mirror
 		return m_types;
 	}
 
-	PointerTypeDesc::PointerTypeDesc(size_t _typeHash, TypeDesc* _subType)
-		: TypeDesc(Type_Pointer, "pointer", _typeHash)
+	PointerTypeDesc::PointerTypeDesc(size_t _typeHash, TypeDesc* _subType, FactoryFunctionPtr _factory)
+		: TypeDesc(Type_Pointer, "pointer", _typeHash, sizeof(void*), _factory)
 		, m_subType(_subType)
 	{
 		
 	}
 
-	FixedSizeArrayTypeDesc::FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _size)
-		: TypeDesc(Type_FixedSizeArray, "fixed_size_array", _typeHash)
+	FixedSizeArrayTypeDesc::FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _elementCount, size_t _size)
+		: TypeDesc(Type_FixedSizeArray, "fixed_size_array", _typeHash, _size)
 		, m_subType(_subType)
-		, m_size(_size)
+		, m_elementCount(_elementCount)
 	{
 
 	}
 
 	Enum::Enum(const char* _name, size_t _typeHash, TypeDesc* _subType)
-		: TypeDesc(Type_Enum, _name, _typeHash)
+		: TypeDesc(Type_Enum, _name, _typeHash, _subType ? _subType->getSize() : sizeof(int))
 		, m_subType(_subType ? _subType : TypeDescGetter<int>::Get())
 	{
 
