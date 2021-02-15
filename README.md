@@ -2,7 +2,7 @@
 mirror is a lightweight C++ reflection framework that aims at providing a simple and expressive way of adding reflection/introspection to a C++ project.
 
 ## Manifesto (enforced in this framework, but actually applies to any coding project)
-- Simple ideas should be simple to write.
+- Simple ideas should be simple to write, and reflection is a simple idea.
 - If you are not using it, it should not do anything.
 - Redundant declaration is evil and should be avoided at all cost.
 - A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2021.
@@ -80,7 +80,7 @@ MIRROR_ENUM(MyEnum)
 ```
 
 ## How to use
-- Any reflected class gains a public `GetClass()` static function that allow to iterate through reflected members, access their types and find their address on given instances. You can also access it from the oustide with the function `mirror::GetClass<T>()`
+- Any reflected class gains a public `GetClass()` static function that allow to iterate through reflected members, access their types and find their address on given instances. You can also access the reflected type one any type from the oustide with the function `mirror::GetTypeDesc<T>()` or `mirror::GetTypeDesc(myVariable)`
 - Classes inheritance schemes can be checked at runtime by using the `Class::isChildOf` method.
 - A cheap dynamic cast is also available by using the static `mirror::Cast<TargetType>(SourceType)` method.
 - You can access a static function return and arguments types by calling `mirror::GetStaticFunctionType()` on a static function pointer.
