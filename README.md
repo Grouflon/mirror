@@ -2,7 +2,7 @@
 mirror is a lightweight C++ reflection framework that aims at providing a simple and expressive way of adding reflection/introspection to a C++ project.
 
 ## Manifesto (enforced in this framework, but actually applies to any coding project)
-- Simple ideas should be simple to write, and reflection is a simple idea.
+- Simple ideas should be simple to write.
 - If you are not using it, it should not do anything.
 - Redundant declaration is evil and should be avoided at all cost.
 - A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2021.
