@@ -65,6 +65,19 @@ namespace mirror
 		TypeDesc* m_subType;
 	};
 
+	class FixedSizeArrayTypeDesc : public TypeDesc
+	{
+	public:
+		FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _size);
+
+		TypeDesc* getSubType() const { return m_subType; }
+		size_t getSize() const { return m_size; }
+
+	private:
+		TypeDesc* m_subType;
+		size_t m_size;
+	};
+
 	class ClassMember
 	{
 		friend class Class;
@@ -114,6 +127,78 @@ namespace mirror
 		std::unordered_map<uint32_t, ClassMember*> m_membersByName;
 	};
 
+	class EnumValue
+	{
+	public:
+		EnumValue(const char* _name, int64_t _value);
+		
+		const char* getName() const;
+		int64_t getValue() const;
+
+	private:
+		std::string m_name;
+		int64_t m_value;
+	};
+
+	class Enum : public TypeDesc
+	{
+	public:
+		Enum(const char* _name, size_t _typeHash, TypeDesc* _subType = nullptr);
+
+		template <typename T>
+		bool getValueFromString(const char* _string, T& _outValue) const
+		{
+			if (_string == nullptr)
+				return false;
+
+			size_t hash = HashCString(_string);
+			auto it = m_valuesByNameHash.find(hash);
+			if (it != m_valuesByNameHash.end())
+			{
+				_outValue = static_cast<T>(it->second->getValue());
+				return true;
+			}
+			return false;
+		}
+
+		template <typename T>
+		bool getStringFromValue(T _value, const char*& _outString) const
+		{
+			int64_t value = static_cast<int64_t>(_value);
+			for (auto it = m_values.begin(); it != m_values.end(); ++it)
+			{
+				EnumValue* enumValue = *it;
+				if (enumValue->getValue() == value)
+				{
+					_outString = enumValue->getName();
+					return true;
+				}
+			}
+			return false;
+		}
+
+		const std::vector<EnumValue*>& getValues() const;
+		void addValue(EnumValue* _value);
+
+		TypeDesc* getSubType() const { return m_subType; }
+
+	private:
+		std::vector<EnumValue*> m_values;
+		std::unordered_map<size_t, EnumValue*> m_valuesByNameHash;
+
+		TypeDesc* m_subType;
+	};
+
+	template<typename T>
+	Enum* GetEnum()
+	{
+		TypeDesc* type = TypeDescGetter<T>::Get();
+		if (type->getType() != Type_Enum)
+			return nullptr;
+
+		return static_cast<Enum*>(type);
+	}
+
 	class TypeSet
 	{
 	public:
@@ -124,14 +209,14 @@ namespace mirror
 		void addType(TypeDesc* _type);
 		void removeType(TypeDesc* _type);
 
-		const std::set<TypeDesc*>& GetTypes() const;
+		const std::set<TypeDesc*>& getTypes() const;
 
 	private:
 		std::set<TypeDesc*> m_types;
 		std::unordered_map<size_t, TypeDesc*> m_typesByTypeHash;
 	};
 
-	template <typename T, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
+	template <typename T, typename IsArray = void, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
 	struct TypeDescGetter
 	{
 		static TypeDesc* Get()
@@ -141,7 +226,18 @@ namespace mirror
 	};
 
 	template <typename T>
-	struct TypeDescGetter<T, std::enable_if_t<std::is_pointer<T>::value>>
+	struct TypeDescGetter<T, std::enable_if_t<std::is_array<T>::value>>
+	{
+		static TypeDesc* Get()
+		{
+			using type = typename typename std::remove_extent<T>::type;
+			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get(), std::extent<T>::value);
+			return &s_fixedSizeArrayTypeDesc;
+		}
+	};
+
+	template <typename T>
+	struct TypeDescGetter<T, void, std::enable_if_t<std::is_pointer<T>::value>>
 	{
 		static TypeDesc* Get()
 		{
@@ -166,7 +262,7 @@ namespace mirror
 	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double, "double", typeid(double).hash_code()); return &s_typeDesc; } };
 
 	template <typename T>
-	struct TypeDescGetter<T, void, std::enable_if_t<std::is_enum<T>::value>>
+	struct TypeDescGetter<T, void, void, std::enable_if_t<std::is_enum<T>::value>>
 	{
 		static TypeDesc* Get()
 		{
@@ -182,7 +278,7 @@ namespace mirror
 	};
 
 	template <typename T>
-	TypeDesc* GetTypeDesc(T) { return TypeDescGetter<T>::Get(); }
+	TypeDesc* GetTypeDesc(T&) { return TypeDescGetter<T>::Get(); }
 
 	template <typename T>
 	Class* GetClass()
@@ -330,7 +426,7 @@ namespace mirror
 		assert(argumentsCount == _memberCount);
 		FunctionArgumentsFiller<0, argumentsCount>::Fill(_classInstance, _memberNames, _memberCount, arguments);
 
-		return CallFunction(&MyStaticFunction, arguments);
+		return CallFunction(_functionPointer, arguments);
 	}
 
 	class StaticFunction : public TypeDesc
@@ -359,7 +455,7 @@ namespace mirror
 	};
 
 	template <typename T>
-	struct TypeDescGetter<T, void, void, std::enable_if_t<std::is_function<T>::value>>
+	struct TypeDescGetter<T, void, void, void, std::enable_if_t<std::is_function<T>::value>>
 	{
 		static TypeDesc* Get()
 		{

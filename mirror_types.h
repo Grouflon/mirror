@@ -21,16 +21,15 @@ namespace mirror
 		Type_float,
 		Type_double,
 
+		Type_Enum,
+
 		Type_std_string,
 		Type_std_vector,
-
-		/*Type_c_string,
-		Type_c_fixedArray,
-		Type_c_dynamicArray,*/
 
 		Type_Class,
 
 		Type_Pointer,
+		Type_FixedSizeArray,
 
 		Type_StaticFunction,
 

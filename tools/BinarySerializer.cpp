@@ -168,6 +168,44 @@ namespace mirror
 		case Type_double:
 			_serialize<double>(_dataBuffer, _object);
 			break;
+		case Type_Enum:
+		{
+			const Enum* enumTypeDesc = static_cast<const Enum*>(_typeDesc);
+
+			if (m_isWriting)
+			{
+				int64_t value;
+				switch (enumTypeDesc->getSubType()->getType())
+				{
+				case Type_int8: value = static_cast<int64_t>(*reinterpret_cast<int8_t*>(_object)); break;
+				case Type_int16: value = static_cast<int64_t>(*reinterpret_cast<int16_t*>(_object)); break;
+				case Type_int32: value = static_cast<int64_t>(*reinterpret_cast<int32_t*>(_object)); break;
+				case Type_int64: value = static_cast<int64_t>(*reinterpret_cast<int64_t*>(_object)); break;
+				}
+
+				const char* str = "";
+				if (enumTypeDesc->getStringFromValue(value, str))
+				{
+					size_t length = strlen(str);
+					_dataBuffer->write(str, length + 1);
+				}
+			}
+			else if (m_isReading)
+			{
+				char* str = reinterpret_cast<char*>(_dataBuffer->data + _dataBuffer->cursor);
+				int64_t value;
+				enumTypeDesc->getValueFromString(str, value);
+
+				switch (enumTypeDesc->getSubType()->getType())
+				{
+				case Type_int8: *reinterpret_cast<int8_t*>(_object) = static_cast<int8_t>(value); break;
+				case Type_int16: *reinterpret_cast<int16_t*>(_object) = static_cast<int16_t>(value); break;
+				case Type_int32: *reinterpret_cast<int32_t*>(_object) = static_cast<int32_t>(value); break;
+				case Type_int64: *reinterpret_cast<int64_t*>(_object) = static_cast<int64_t>(value); break;
+				}
+			}
+		}
+		break;
 		case Type_std_string:
 		{
 			std::string* stringPtr = reinterpret_cast<std::string*>(_object);

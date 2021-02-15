@@ -292,7 +292,7 @@ namespace mirror
 		m_types.erase(it2);
 	}
 
-	const std::set<TypeDesc*>& TypeSet::GetTypes() const
+	const std::set<TypeDesc*>& TypeSet::getTypes() const
 	{
 		return m_types;
 	}
@@ -302,6 +302,54 @@ namespace mirror
 		, m_subType(_subType)
 	{
 		
+	}
+
+	FixedSizeArrayTypeDesc::FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _size)
+		: TypeDesc(Type_FixedSizeArray, "fixed_size_array", _typeHash)
+		, m_subType(_subType)
+		, m_size(_size)
+	{
+
+	}
+
+	Enum::Enum(const char* _name, size_t _typeHash, TypeDesc* _subType)
+		: TypeDesc(Type_Enum, _name, _typeHash)
+		, m_subType(_subType ? _subType : TypeDescGetter<int>::Get())
+	{
+
+	}
+
+	const std::vector<EnumValue*>& Enum::getValues() const
+	{
+		return m_values;
+	}
+
+	void Enum::addValue(EnumValue* _value)
+	{
+		assert(_value != nullptr);
+		assert(std::find(m_values.begin(), m_values.end(), _value) == m_values.end());
+		size_t hash = HashCString(_value->getName());
+		assert(m_valuesByNameHash.find(hash) == m_valuesByNameHash.end());
+
+		m_values.push_back(_value);
+		m_valuesByNameHash.insert(std::make_pair(hash, _value));
+	}
+
+	EnumValue::EnumValue(const char* _name, int64_t _value)
+		: m_name(_name)
+		, m_value(_value)
+	{
+
+	}
+
+	const char* EnumValue::getName() const
+	{
+		return m_name.c_str();
+	}
+
+	int64_t EnumValue::getValue() const
+	{
+		return m_value;
 	}
 
 }
