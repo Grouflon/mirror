@@ -181,6 +181,7 @@ namespace mirror
 				case Type_int16: value = static_cast<int64_t>(*reinterpret_cast<int16_t*>(_object)); break;
 				case Type_int32: value = static_cast<int64_t>(*reinterpret_cast<int32_t*>(_object)); break;
 				case Type_int64: value = static_cast<int64_t>(*reinterpret_cast<int64_t*>(_object)); break;
+				default: assert(false); break;
 				}
 
 				const char* str = "";

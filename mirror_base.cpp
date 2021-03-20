@@ -6,21 +6,28 @@
 #include <cassert>
 #include <algorithm>
 
+#define ALLOCATE_AND_COPY_STRING(_dst, _src) { _dst = (char*)malloc(strlen(_src) + 1); strcpy(_dst, _src); }
+
 namespace mirror
 {
 	TypeSet g_typeSet;
 	std::unordered_map<size_t, StaticFunction*> g_functionsByTypeHash;
 
 	MetaData::MetaData(const char* _name, const char* _data)
-		: m_name(_name)
-		, m_data(_data)
 	{
+		ALLOCATE_AND_COPY_STRING(m_name, _name);
+		ALLOCATE_AND_COPY_STRING(m_data, _data);
+	}
 
+	MetaData::~MetaData()
+	{
+		free(m_name);
+		free(m_data);
 	}
 
 	const char* MetaData::getName() const
 	{
-		return m_name.c_str();
+		return m_name;
 	}
 
 	bool MetaData::asBool() const
@@ -40,35 +47,19 @@ namespace mirror
 
 	const char* MetaData::asString() const
 	{
-		return m_data.c_str();
+		return m_data;
 	}
 
-#define OFFSET_BASIS	2166136261
-#define FNV_PRIME		16777619
-
-	uint32_t Hash32(const void* _data, size_t _size)
+	TypeDesc::TypeDesc(Type _type, const char* _name, size_t _typeHash)
+		: m_type(_type)
+		, m_typeHash(_typeHash)
 	{
-		if (_size == 0)
-		{
-			return 0;
-		}
-
-		// FNV-1a algorithm
-		// http://isthe.com/chongo/tech/comp/fnv/
-		uint32_t hash = OFFSET_BASIS;
-		const uint8_t* buf = static_cast<const uint8_t*>(_data);
-		for (uint32_t i = 0u; i < _size; i++)
-		{
-			hash = hash * FNV_PRIME;
-			hash = hash ^ *buf;
-			++buf;
-		}
-		return hash;
+		ALLOCATE_AND_COPY_STRING(m_name, _name);
 	}
 
-	uint32_t HashCString(const char* _str)
+	TypeDesc::~TypeDesc()
 	{
-		return Hash32(_str, strlen(_str));
+		free(m_name);
 	}
 
 	void sanitizeMetaDataString(char* _buf)
@@ -102,10 +93,11 @@ namespace mirror
 	}
 
 	ClassMember::ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString)
-		: m_name(_name)
-		, m_offset(_offset)
+		: m_offset(_offset)
 		, m_type(_type)
 	{
+		ALLOCATE_AND_COPY_STRING(m_name, _name);
+
 		// Parse meta data
 		assert(_metaDataString);
 		size_t len = strlen(_metaDataString);
@@ -158,6 +150,11 @@ namespace mirror
 				value = cur + 1;
 			}
 		}
+	}
+
+	ClassMember::~ClassMember()
+	{
+		free(m_name);
 	}
 
 	void* ClassMember::getInstanceMemberPointer(void* _classInstancePointer) const
@@ -336,21 +333,46 @@ namespace mirror
 	}
 
 	EnumValue::EnumValue(const char* _name, int64_t _value)
-		: m_name(_name)
-		, m_value(_value)
+		: m_value(_value)
 	{
-
+		ALLOCATE_AND_COPY_STRING(m_name, _name);
+	}
+	EnumValue::~EnumValue()
+	{
+		free(m_name);
 	}
 
-	const char* EnumValue::getName() const
+	TypeSet* GetTypeSet()
 	{
-		return m_name.c_str();
+		return &g_typeSet;
 	}
 
-	int64_t EnumValue::getValue() const
+	#define OFFSET_BASIS	2166136261
+	#define FNV_PRIME		16777619
+
+	uint32_t Hash32(const void* _data, size_t _size)
 	{
-		return m_value;
+		if (_size == 0)
+		{
+			return 0;
+		}
+
+		// FNV-1a algorithm
+		// http://isthe.com/chongo/tech/comp/fnv/
+		uint32_t hash = OFFSET_BASIS;
+		const uint8_t* buf = static_cast<const uint8_t*>(_data);
+		for (uint32_t i = 0u; i < _size; i++)
+		{
+			hash = hash * FNV_PRIME;
+			hash = hash ^ *buf;
+			++buf;
+		}
+		return hash;
 	}
 
+	uint32_t HashCString(const char* _str)
+	{
+		return Hash32(_str, strlen(_str));
+	}
 }
 

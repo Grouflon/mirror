@@ -12,7 +12,7 @@ public:\
 		if (!s_class)\
 		{\
 			s_class = new ::mirror::Class(#_class, typeid(_class).hash_code());\
-			::mirror::g_typeSet.addType(s_class);\
+			::mirror::GetTypeSet()->addType(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
 			__MIRROR_CLASS_CONTENT
@@ -27,7 +27,7 @@ public:\
 		if (!s_class)\
 		{\
 			s_class = new ::mirror::Class(#_class, typeid(_class).hash_code());\
-			::mirror::g_typeSet.addType(s_class);\
+			::mirror::GetTypeSet()->addType(s_class);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
 			__MIRROR_CLASS_CONTENT
@@ -91,7 +91,7 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 
 #define __MIRROR_ENUM_CONTENT(...)\
 		__VA_ARGS__\
-		g_typeSet.addType(s_enum);\
+		GetTypeSet()->addType(s_enum);\
 	}\
 	return s_enum;\
 }};

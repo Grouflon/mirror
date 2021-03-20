@@ -4,7 +4,6 @@
 #include <unordered_map>
 #include <vector>
 #include <set>
-#include <string>
 #include <type_traits>
 #include <typeinfo>
 #include <assert.h>
@@ -16,9 +15,10 @@ namespace mirror
 	class Class;
 	class TypeDesc;
 
-	struct MetaData
+	struct MIRROR_API MetaData
 	{
 		MetaData(const char* _name, const char* _data);
+		~MetaData();
 
 		const char* getName() const;
 
@@ -28,33 +28,27 @@ namespace mirror
 		const char* asString() const;
 
 	private:
-		std::string m_name;
-		std::string m_data;
+		char* m_name;
+		char* m_data;
 	};
 
-	class TypeDesc
+	class MIRROR_API TypeDesc
 	{
 	public:
-		TypeDesc(Type _type, const char* _name, size_t _typeHash)
-			: m_type(_type)
-			, m_name(_name)
-			, m_typeHash(_typeHash)
-		{}
-
-		// NOTE(Remi|2020/04/26): virtual specifier is not needed, but is added to allow the debugger to show inherited types
-		virtual ~TypeDesc() {}
+		TypeDesc(Type _type, const char* _name, size_t _typeHash);
+		virtual ~TypeDesc(); // NOTE(Remi|2020/04/26): virtual specifier is not needed, but is added to allow the debugger to show inherited types
 
 		Type getType() const { return m_type; }
-		const char* getName() const { return m_name.c_str(); }
+		const char* getName() const { return m_name; }
 		size_t getTypeHash() const { return m_typeHash; }
 
 	private:
 		Type m_type = Type_none;
-		std::string m_name;
+		char* m_name;
 		size_t m_typeHash = 0;
 	};
 
-	class PointerTypeDesc : public TypeDesc
+	class MIRROR_API PointerTypeDesc : public TypeDesc
 	{
 	public:
 		PointerTypeDesc(size_t _typeHash, TypeDesc* _subType);
@@ -65,7 +59,7 @@ namespace mirror
 		TypeDesc* m_subType;
 	};
 
-	class FixedSizeArrayTypeDesc : public TypeDesc
+	class MIRROR_API FixedSizeArrayTypeDesc : public TypeDesc
 	{
 	public:
 		FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _size);
@@ -78,14 +72,15 @@ namespace mirror
 		size_t m_size;
 	};
 
-	class ClassMember
+	class MIRROR_API ClassMember
 	{
 		friend class Class;
 
 	public:
 		ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString);
+		~ClassMember();
 
-		const char* getName() const	{ return m_name.c_str(); }
+		const char* getName() const	{ return m_name; }
 		Class* getClass() const { return m_class; }
 		size_t getOffset() const { return m_offset;	}
 		TypeDesc* getType() const { return m_type; }
@@ -96,14 +91,14 @@ namespace mirror
 
 	private:
 		Class* m_class = nullptr;
-		std::string m_name;
+		char* m_name;
 		size_t m_offset;
 		TypeDesc* m_type = nullptr;
 		std::unordered_map<uint32_t, MetaData> m_metaData;
 	};
 
 
-	class Class : public TypeDesc
+	class MIRROR_API Class : public TypeDesc
 	{
 	public:
 		Class(const char* _name, size_t _typeHash);
@@ -127,20 +122,21 @@ namespace mirror
 		std::unordered_map<uint32_t, ClassMember*> m_membersByName;
 	};
 
-	class EnumValue
+	class MIRROR_API EnumValue
 	{
 	public:
 		EnumValue(const char* _name, int64_t _value);
+		~EnumValue();
 		
-		const char* getName() const;
-		int64_t getValue() const;
+		const char* getName() const { return m_name; }
+		int64_t getValue() const { return m_value; }
 
 	private:
-		std::string m_name;
+		char* m_name;
 		int64_t m_value;
 	};
 
-	class Enum : public TypeDesc
+	class MIRROR_API Enum : public TypeDesc
 	{
 	public:
 		Enum(const char* _name, size_t _typeHash, TypeDesc* _subType = nullptr);
@@ -199,7 +195,7 @@ namespace mirror
 		return static_cast<Enum*>(type);
 	}
 
-	class TypeSet
+	class MIRROR_API TypeSet
 	{
 	public:
 		~TypeSet();
@@ -429,7 +425,7 @@ namespace mirror
 		return CallFunction(_functionPointer, arguments);
 	}
 
-	class StaticFunction : public TypeDesc
+	class MIRROR_API StaticFunction : public TypeDesc
 	{
 	public:
 		StaticFunction(size_t _typeHash)
@@ -485,10 +481,10 @@ namespace mirror
 		return static_cast<StaticFunction*>(TypeDescGetter<F>::Get());
 	}
 
+	MIRROR_API TypeSet* GetTypeSet();
+	extern TypeSet g_typeSet;
+	
 	uint32_t Hash32(const void* _data, size_t _size);
 	uint32_t HashCString(const char* _str);
-
-	extern TypeSet g_typeSet;
-
 }
 
