@@ -15,7 +15,6 @@ namespace mirror
 {
 	class Class;
 	class TypeDesc;
-	typedef void* (*FactoryFunctionPtr)();
 
 	struct MetaData
 	{
@@ -36,50 +35,112 @@ namespace mirror
 	struct MetaDataSet
 	{
 		MetaDataSet(const char* _metaDataString);
+		MetaDataSet(const MetaDataSet& _other);
 		const MetaData* findMetaData(const char* _key) const;
 
 	private:
 		std::unordered_map<uint32_t, MetaData> m_metaData;
 	};
 
-	template <typename T> void* SimpleFactory() { return new T; }
+	class VirtualTypeWrapper
+	{
+	public:
+		size_t getTypeHash() const { return m_typeHash; }
+		size_t getSize() const { return m_size; }
+
+		virtual bool hasFactory() const { return false; }
+		virtual void* instantiate() const { return nullptr; }
+
+		virtual Class* unsafeVirtualGetClass(void* _object) const { return nullptr; }
+
+	protected:
+		size_t m_typeHash = 0;
+		size_t m_size = 0;
+	};
+
+	template <typename T>
+	class TVirtualTypeWrapperBase : public VirtualTypeWrapper
+	{
+	public:
+		TVirtualTypeWrapperBase()
+		{
+			m_typeHash = typeid(T).hash_code();
+			m_size = sizeof(T);
+		}
+	};
+
+	template <>
+	class TVirtualTypeWrapperBase<void> : public VirtualTypeWrapper
+	{
+	public:
+		TVirtualTypeWrapperBase()
+		{
+			m_typeHash = typeid(void).hash_code();
+			m_size = 0;
+		}
+	};
+
+	template <typename T, bool Factory = false>
+	class TVirtualTypeWrapperFactory : public TVirtualTypeWrapperBase<T>
+	{
+	};
+
+	template <typename T>
+	class TVirtualTypeWrapperFactory<T, true> : public TVirtualTypeWrapperBase<T>
+	{
+	public:
+		virtual bool hasFactory() const override { return true; }
+		virtual void* instantiate() const override { return new T(); }
+	};
+
+	template <typename T, bool Factory = false, bool IsClass = false>
+	class TVirtualTypeWrapper : public TVirtualTypeWrapperFactory<T, Factory>
+	{
+	};
+
+	template <typename T, bool Factory>
+	class TVirtualTypeWrapper<T, Factory, true> : public TVirtualTypeWrapperFactory<T, Factory>
+	{
+		virtual Class* unsafeVirtualGetClass(void* _object) const { return reinterpret_cast<T*>(_object)->getClass(); }
+	};
 
 	class TypeDesc
 	{
 	public:
-		TypeDesc(Type _type, const char* _name, size_t _typeHash, size_t _size, FactoryFunctionPtr _factory = nullptr)
+		TypeDesc(Type _type, const char* _name, VirtualTypeWrapper* _virtualTypeWrapper)
 			: m_type(_type)
 			, m_name(_name)
-			, m_typeHash(_typeHash)
-			, m_size(_size)
-			, m_factory(_factory)
+			, m_virtualTypeWrapper(_virtualTypeWrapper)
 		{}
 
 		// NOTE(Remi|2020/04/26): virtual specifier is not needed, but is added to allow the debugger to show inherited types
-		virtual ~TypeDesc() {}
+		virtual ~TypeDesc()
+		{
+			if (m_virtualTypeWrapper) delete m_virtualTypeWrapper;
+		}
 
 		Type getType() const { return m_type; }
 		const char* getName() const { return m_name.c_str(); }
-		size_t getTypeHash() const { return m_typeHash; }
-		size_t getSize() const { return m_size; }
+		size_t getTypeHash() const { return m_virtualTypeWrapper->getTypeHash(); }
+		size_t getSize() const { return m_virtualTypeWrapper->getSize(); }
 
 		// @TODO(2021/02/15|Remi): Allow the user to choose their allocator
-		void setFactory(FactoryFunctionPtr _factory);
 		bool hasFactory() const;
 		void* instantiate() const;
+
+	protected:
+		const VirtualTypeWrapper* getVirtualTypeWrapper() const { return m_virtualTypeWrapper; }
 
 	private:
 		Type m_type = Type_none;
 		std::string m_name;
-		size_t m_typeHash = 0;
-		size_t m_size = 0;
-		FactoryFunctionPtr m_factory = nullptr;
+		VirtualTypeWrapper* m_virtualTypeWrapper = nullptr;
 	};
 
 	class PointerTypeDesc : public TypeDesc
 	{
 	public:
-		PointerTypeDesc(size_t _typeHash, TypeDesc* _subType, FactoryFunctionPtr _factory = nullptr);
+		PointerTypeDesc(TypeDesc* _subType, VirtualTypeWrapper* _virtualTypeWrapper);
 
 		TypeDesc* getSubType() const { return m_subType; }
 
@@ -90,7 +151,7 @@ namespace mirror
 	class FixedSizeArrayTypeDesc : public TypeDesc
 	{
 	public:
-		FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _elementCount, size_t _size);
+		FixedSizeArrayTypeDesc(TypeDesc* _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper);
 
 		TypeDesc* getSubType() const { return m_subType; }
 		size_t getElementCount() const { return m_elementCount; }
@@ -126,7 +187,8 @@ namespace mirror
 	class Class : public TypeDesc
 	{
 	public:
-		Class(const char* _name, size_t _typeHash, size_t _size);
+		Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const char* _metaDataString);
+		Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const MetaDataSet& _metaDataSet);
 		virtual ~Class();
 
 		void getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers = true) const;
@@ -140,11 +202,16 @@ namespace mirror
 		void addMember(ClassMember* _member);
 		void addParent(Class* _parent);
 
+		const MetaDataSet& getMetaDataSet() const { return m_metaDataSet; }
+
+		Class* unsafeVirtualGetClass(void* _object) const;
+
 	private:
 		std::set<Class*> m_parents;
 		std::set<Class*> m_children;
 		std::vector<ClassMember*> m_members;
 		std::unordered_map<uint32_t, ClassMember*> m_membersByName;
+		MetaDataSet m_metaDataSet;
 	};
 
 	class EnumValue
@@ -163,7 +230,7 @@ namespace mirror
 	class Enum : public TypeDesc
 	{
 	public:
-		Enum(const char* _name, size_t _typeHash, TypeDesc* _subType = nullptr);
+		Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeDesc* _subType = nullptr);
 
 		template <typename T>
 		bool getValueFromString(const char* _string, T& _outValue) const
@@ -225,6 +292,7 @@ namespace mirror
 		~TypeSet();
 
 		TypeDesc* findTypeByTypeHash(size_t _typeHash);
+		TypeDesc* findTypeByName(const char* _name);
 
 		void addType(TypeDesc* _type);
 		void removeType(TypeDesc* _type);
@@ -234,6 +302,7 @@ namespace mirror
 	private:
 		std::set<TypeDesc*> m_types;
 		std::unordered_map<size_t, TypeDesc*> m_typesByTypeHash;
+		std::unordered_map<uint32_t, TypeDesc*> m_typesByName;
 	};
 
 	template <typename T, typename IsArray = void, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
@@ -251,7 +320,7 @@ namespace mirror
 		static TypeDesc* Get()
 		{
 			using type = typename typename std::remove_extent<T>::type;
-			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get(), std::extent<T>::value, sizeof(T));
+			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(TypeDescGetter<type>::Get(), std::extent<T>::value , new TVirtualTypeWrapper<T>());
 			return &s_fixedSizeArrayTypeDesc;
 		}
 	};
@@ -262,25 +331,24 @@ namespace mirror
 		static TypeDesc* Get()
 		{
 			using type = typename std::remove_pointer<T>::type;
-			static auto s_factory = []() -> void* { return new T(); };
-			static PointerTypeDesc s_pointerTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get(), s_factory);
+			static PointerTypeDesc s_pointerTypeDesc(TypeDescGetter<type>::Get(), new TVirtualTypeWrapper<T>());
 			return &s_pointerTypeDesc;
 		}
 	};
 
-	template <> struct TypeDescGetter<void> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_void, "void", typeid(void).hash_code(), 0, nullptr); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<bool> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_bool, "bool", typeid(bool).hash_code(), sizeof(bool), &SimpleFactory<bool>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<char> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_char, "char", typeid(char).hash_code(), sizeof(char), &SimpleFactory<char>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int8, "int8", typeid(int8_t).hash_code(), sizeof(int8_t), &SimpleFactory<int8_t>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int16, "int16", typeid(int16_t).hash_code(), sizeof(int16_t), &SimpleFactory<int16_t>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int32, "int32", typeid(int32_t).hash_code(), sizeof(int32_t), &SimpleFactory<int32_t>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int64, "int64", typeid(int64_t).hash_code(), sizeof(int64_t), &SimpleFactory<int64_t>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint8, "uint8", typeid(uint8_t).hash_code(), sizeof(uint8_t), &SimpleFactory<uint8_t>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint16, "uint16", typeid(uint16_t).hash_code(), sizeof(uint16_t), &SimpleFactory<uint16_t>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint32, "uint32", typeid(uint32_t).hash_code(), sizeof(uint32_t), &SimpleFactory<uint32_t>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint64, "uint64", typeid(uint64_t).hash_code(), sizeof(uint64_t), &SimpleFactory<uint64_t>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<float> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_float, "float", typeid(float).hash_code(), sizeof(float), &SimpleFactory<float>); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double, "double", typeid(double).hash_code(), sizeof(double), &SimpleFactory<double>); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<void> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_void, "void", new TVirtualTypeWrapper<void>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<bool> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_bool, "bool", new TVirtualTypeWrapper<bool, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<char> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_char, "char", new TVirtualTypeWrapper<char, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int8, "int8", new TVirtualTypeWrapper<int8_t, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int16, "int16", new TVirtualTypeWrapper<int16_t, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int32, "int32", new TVirtualTypeWrapper<int32_t, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<int64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int64, "int64", new TVirtualTypeWrapper<int64_t, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint8, "uint8", new TVirtualTypeWrapper<uint8_t, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint16, "uint16", new TVirtualTypeWrapper<uint16_t, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint32, "uint32", new TVirtualTypeWrapper<uint32_t, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<uint64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint64, "uint64", new TVirtualTypeWrapper<uint64_t, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<float> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_float, "float", new TVirtualTypeWrapper<float, true>()); return &s_typeDesc; } };
+	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double, "double", new TVirtualTypeWrapper<double, true>()); return &s_typeDesc; } };
 
 	template <typename T>
 	struct TypeDescGetter<T, void, void, std::enable_if_t<std::is_enum<T>::value>>
@@ -314,6 +382,8 @@ namespace mirror
 		}
 		return nullptr;
 	}
+
+	TypeDesc* FindTypeByName(const char* _name);
 
 	template <typename DestType, typename SourceType, typename IsDestLastPointer = void, typename IsSourceLastPointer = void>
 	struct CastClassesUnpiler
@@ -456,8 +526,8 @@ namespace mirror
 	class StaticFunction : public TypeDesc
 	{
 	public:
-		StaticFunction(size_t _typeHash)
-			: TypeDesc(Type_StaticFunction, "StaticFunction", _typeHash, sizeof(void*))
+		StaticFunction(VirtualTypeWrapper* _virtualTypeWrapper)
+			: TypeDesc(Type_StaticFunction, "StaticFunction", _virtualTypeWrapper)
 		{
 		}
 
@@ -486,10 +556,9 @@ namespace mirror
 			static StaticFunction* s_staticFunction = nullptr;
 			if (s_staticFunction == nullptr)
 			{
-				size_t typeHash = typeid(T).hash_code();
-				s_staticFunction = new StaticFunction(typeHash);
-
 				using function_pointer_t = typename std::add_pointer<T>::type;
+
+				s_staticFunction = new StaticFunction(new TVirtualTypeWrapper<function_pointer_t>());
 
 				// Return type
 				using ReturnType = typename FunctionTraits<function_pointer_t>::result;
@@ -511,6 +580,13 @@ namespace mirror
 
 	uint32_t Hash32(const void* _data, size_t _size);
 	uint32_t HashCString(const char* _str);
+
+	template <typename T>
+	struct TypeDescInitializer
+	{
+		TypeDescInitializer() { typeDesc = GetTypeDesc<T>(); }
+		TypeDesc* typeDesc = nullptr;
+	};
 
 	extern TypeSet g_typeSet;
 

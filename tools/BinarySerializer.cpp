@@ -287,6 +287,12 @@ namespace mirror
 						_dataBuffer->write(isValidPointer);
 						if (isValidPointer)
 						{
+							if (subType->getType() == Type_Class)
+							{
+								subType = reinterpret_cast<const Class*>(subType)->unsafeVirtualGetClass(*pointerPtr);
+								std::string className = subType->getName();
+								_dataBuffer->write(className);
+							}
 							_serialize(_dataBuffer, *pointerPtr, subType, nullptr);
 						}
 					}
@@ -298,6 +304,14 @@ namespace mirror
 						_dataBuffer->read(isValidPointer);
 						if (isValidPointer)
 						{
+							if (subType->getType() == Type_Class)
+							{
+								std::string className;
+								_dataBuffer->read(className);
+								subType = mirror::FindTypeByName(className.c_str());
+								assert(subType);
+							}
+
 							*pointerPtr = subType->instantiate();
 							_serialize(_dataBuffer, *pointerPtr, subType, nullptr);
 						}

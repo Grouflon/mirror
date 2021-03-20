@@ -14,6 +14,11 @@ namespace mirror
 #define OFFSET_BASIS	2166136261
 #define FNV_PRIME		16777619
 
+	mirror::TypeDesc* FindTypeByName(const char* _name)
+	{
+		return ::mirror::g_typeSet.findTypeByName(_name);
+	}
+
 	uint32_t Hash32(const void* _data, size_t _size)
 	{
 		if (_size == 0)
@@ -162,6 +167,11 @@ namespace mirror
 		}
 	}
 
+	MetaDataSet::MetaDataSet(const MetaDataSet& _other)
+	{
+		m_metaData = _other.m_metaData;
+	}
+
 	const mirror::MetaData* MetaDataSet::findMetaData(const char* _key) const
 	{
 		if (_key == nullptr)
@@ -175,23 +185,14 @@ namespace mirror
 		return &it->second;
 	}
 
-	void TypeDesc::setFactory(FactoryFunctionPtr _factory)
-	{
-		m_factory = _factory;
-	}
-
 	bool TypeDesc::hasFactory() const
 	{
-		return m_factory != nullptr;
+		return m_virtualTypeWrapper->hasFactory();
 	}
 
 	void* TypeDesc::instantiate() const
 	{
-		if (m_factory != nullptr)
-		{
-			return m_factory();
-		}
-		return nullptr;
+		return m_virtualTypeWrapper->instantiate();
 	}
 
 	ClassMember::ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString)
@@ -208,8 +209,15 @@ namespace mirror
 		return reinterpret_cast<uint8_t*>(_classInstancePointer) + m_offset;
 	}
 
-	Class::Class(const char* _name, size_t _typeHash, size_t _size)
-		: TypeDesc(Type_Class, _name, _typeHash, _size)
+	Class::Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const char* _metaDataString)
+		: Class(_name, _virtualTypeWrapper, MetaDataSet(_metaDataString))
+	{
+
+	}
+
+	Class::Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const MetaDataSet& _metaDataSet)
+		: TypeDesc(Type_Class, _name, _virtualTypeWrapper)
+		, m_metaDataSet(_metaDataSet)
 	{
 
 	}
@@ -289,6 +297,11 @@ namespace mirror
 		_parent->m_children.insert(this);
 	}
 
+	mirror::Class* Class::unsafeVirtualGetClass(void* _object) const
+	{
+		return getVirtualTypeWrapper()->unsafeVirtualGetClass(_object);
+	}
+
 	TypeSet::~TypeSet()
 	{
 		for (TypeDesc* type : m_types)
@@ -297,6 +310,7 @@ namespace mirror
 		}
 		m_types.clear();
 		m_typesByTypeHash.clear();
+		m_typesByName.clear();
 	}
 
 	TypeDesc* TypeSet::findTypeByTypeHash(size_t _typeHash)
@@ -305,14 +319,25 @@ namespace mirror
 		return it != m_typesByTypeHash.end() ? it->second : nullptr;
 	}
 
+	mirror::TypeDesc* TypeSet::findTypeByName(const char* _name)
+	{
+		uint32_t nameHash = HashCString(_name);
+		auto it = m_typesByName.find(nameHash);
+		return it != m_typesByName.end() ? it->second : nullptr;
+	}
+
 	void TypeSet::addType(TypeDesc* _type)
 	{
-		// Checks if a type with the same typehash does not already exists
 		assert(_type);
+		uint32_t nameHash = HashCString(_type->getName());
+
+		// Checks if a type with the same typehash or namehash does not already exists
 		assert(m_typesByTypeHash.find(_type->getTypeHash()) == m_typesByTypeHash.end());
+		assert(m_typesByName.find(nameHash) == m_typesByName.end());
 		assert(m_types.find(_type) == m_types.end());
 
 		m_typesByTypeHash.insert(std::make_pair(_type->getTypeHash(), _type));
+		m_typesByName.insert(std::make_pair(nameHash, _type));
 		m_types.emplace(_type);
 	}
 
@@ -320,14 +345,25 @@ namespace mirror
 	{
 		assert(_type);
 
-		// Checks if a type with the same typehash already exists
-		auto it = m_typesByTypeHash.find(_type->getTypeHash());
-		assert(it != m_typesByTypeHash.end());
-		m_typesByTypeHash.erase(it);
-
-		auto it2 = m_types.find(_type);
-		assert(it2 != m_types.end());
-		m_types.erase(it2);
+		// Checks if a type with the same typehash or namehash already exists
+		{
+			auto it = m_typesByTypeHash.find(_type->getTypeHash());
+			assert(it != m_typesByTypeHash.end());
+			m_typesByTypeHash.erase(it);
+		}
+		
+		{
+			uint32_t nameHash = HashCString(_type->getName());
+			auto it = m_typesByName.find(nameHash);
+			assert(it != m_typesByName.end());
+			m_typesByName.erase(it);
+		}
+		
+		{
+			auto it = m_types.find(_type);
+			assert(it != m_types.end());
+			m_types.erase(it);
+		}
 	}
 
 	const std::set<TypeDesc*>& TypeSet::getTypes() const
@@ -335,23 +371,23 @@ namespace mirror
 		return m_types;
 	}
 
-	PointerTypeDesc::PointerTypeDesc(size_t _typeHash, TypeDesc* _subType, FactoryFunctionPtr _factory)
-		: TypeDesc(Type_Pointer, "pointer", _typeHash, sizeof(void*), _factory)
+	PointerTypeDesc::PointerTypeDesc(TypeDesc* _subType, VirtualTypeWrapper* _virtualTypeWrapper)
+		: TypeDesc(Type_Pointer, "pointer", _virtualTypeWrapper)
 		, m_subType(_subType)
 	{
 		
 	}
 
-	FixedSizeArrayTypeDesc::FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _elementCount, size_t _size)
-		: TypeDesc(Type_FixedSizeArray, "fixed_size_array", _typeHash, _size)
+	FixedSizeArrayTypeDesc::FixedSizeArrayTypeDesc(TypeDesc* _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper)
+		: TypeDesc(Type_FixedSizeArray, "fixed_size_array", _virtualTypeWrapper)
 		, m_subType(_subType)
 		, m_elementCount(_elementCount)
 	{
 
 	}
 
-	Enum::Enum(const char* _name, size_t _typeHash, TypeDesc* _subType)
-		: TypeDesc(Type_Enum, _name, _typeHash, _subType ? _subType->getSize() : sizeof(int))
+	Enum::Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeDesc* _subType)
+		: TypeDesc(Type_Enum, _name, _virtualTypeWrapper)
 		, m_subType(_subType ? _subType : TypeDescGetter<int>::Get())
 	{
 
