@@ -14,36 +14,26 @@ public:\
 	__MIRROR_CLASS_CONSTRUCTION(_class, __VA_ARGS__)
 
 #define __MIRROR_CLASS_CONSTRUCTION(_class, ...)\
-	static inline ::mirror::TypeDescInitializer<_class> __MirrorInitializer;\
-	static ::mirror::Class* GetClass()\
+	static ::mirror::Class* GetClass() { return ::mirror::GetClass<_class>(); }\
+	\
+	static ::mirror::ClassInitializer<_class, true> __MirrorInitializer;\
+	static ::mirror::Class* __MirrorCreateClass()\
 	{\
-		using classType = _class; \
-		static ::mirror::Class* s_class = nullptr;\
-		if (!s_class)\
+		using classType = _class;\
+		\
+		const char* metaDataString = #__VA_ARGS__##"";\
+		mirror::MetaDataSet metaDataSet(metaDataString);\
+		mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType, true, true>();\
+		::mirror::Class* clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
+		char fakePrototype[sizeof(_class)] = {};\
+		_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
 		{\
-			{\
-				const char* metaDataString = #__VA_ARGS__##"";\
-				mirror::MetaDataSet metaDataSet(metaDataString);\
-				mirror::VirtualTypeWrapper* virtualTypeWrapper = nullptr;\
-				if (metaDataSet.findMetaData("Factory"))\
-				{\
-					virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType, true, true>();\
-				}\
-				else\
-				{\
-					virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType, false, true>();\
-				}\
-				s_class = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
-			}\
-			::mirror::g_typeSet.addType(s_class);\
-			char fakePrototype[sizeof(_class)] = {};\
-			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
-			__MIRROR_CLASS_CONTENT
+		__MIRROR_CLASS_CONTENT
 
 #define __MIRROR_CLASS_CONTENT(...)\
 			__VA_ARGS__\
 		}\
-		return s_class;\
+		return clss;\
 	}
 
 #define MIRROR_MEMBER(_memberName)\
@@ -55,14 +45,17 @@ public:\
 
 #define __MIRROR_MEMBER_CONTENT(...)\
 		const char* metaDataString = #__VA_ARGS__##"";\
-		::mirror::ClassMember* classMember = new ::mirror::ClassMember(memberName, offset, type, metaDataString);\
-		s_class->addMember(classMember);\
+		::mirror::ClassMember* classMember = new ::mirror::ClassMember(memberName, offset, type->getTypeID(), metaDataString);\
+		clss->addMember(classMember);\
 	}
 
 #define MIRROR_PARENT(_parentClass)\
 	{\
-		s_class->addParent(::mirror::GetClass<_parentClass>());\
+		clss->addParent(::mirror::GetClass<_parentClass>());\
 	}
+
+#define MIRROR_CLASS_DEFINITION(_class)\
+	::mirror::ClassInitializer<_class, true> _class::__MirrorInitializer;
 
 #define MIRROR_ENUM(_enumName)\
 template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDesc* Get() { \
@@ -99,7 +92,7 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 
 #define __MIRROR_ENUM_CONTENT(...)\
 		__VA_ARGS__\
-		::mirror::g_typeSet.addType(s_enum);\
+		::mirror::GetTypeSet()->addType(s_enum);\
 	}\
 	return s_enum;\
 }};
