@@ -12,6 +12,12 @@
 
 namespace mirror
 {
+	typedef size_t TypeID;
+	const size_t UNDEFINED_TYPEID = 0;
+
+	uint32_t Hash32(const void* _data, size_t _size);
+	uint32_t HashCString(const char* _str);
+
 	class Class;
 	class TypeDesc;
 
@@ -32,44 +38,144 @@ namespace mirror
 		char* m_data;
 	};
 
+	struct MIRROR_API MetaDataSet
+	{
+		MetaDataSet(const char* _metaDataString);
+		MetaDataSet(const MetaDataSet& _other);
+		const MetaData* findMetaData(const char* _key) const;
+
+	private:
+		std::unordered_map<uint32_t, MetaData> m_metaData;
+	};
+
+	template <typename T>
+	constexpr TypeID GetTypeID()
+	{
+		return typeid(T).hash_code();
+	}
+
+	class MIRROR_API VirtualTypeWrapper
+	{
+	public:
+		TypeID getTypeID() const { return m_typeID; }
+		size_t getSize() const { return m_size; }
+
+		virtual bool hasFactory() const { return false; }
+		virtual void* instantiate() const { return nullptr; }
+
+		virtual Class* unsafeVirtualGetClass(void* _object) const { return nullptr; }
+
+	protected:
+		TypeID m_typeID = UNDEFINED_TYPEID;
+		size_t m_size = 0;
+	};
+
+	template <typename T, typename IsShallow = void>
+	class TVirtualTypeWrapperBase : public VirtualTypeWrapper
+	{
+	public:
+		TVirtualTypeWrapperBase()
+		{
+			m_typeID = GetTypeID<T>();
+			m_size = sizeof(T);
+		}
+	};
+
+	template <typename T>
+	class TVirtualTypeWrapperBase<T, std::enable_if_t<std::is_function<T>::value || std::is_void<T>::value>> : public VirtualTypeWrapper
+	{
+	public:
+		TVirtualTypeWrapperBase()
+		{
+			m_typeID = GetTypeID<T>();
+			m_size = 0;
+		}
+	};
+
+	template <>
+	class TVirtualTypeWrapperBase<void> : public VirtualTypeWrapper
+	{
+	public:
+		TVirtualTypeWrapperBase()
+		{
+			m_typeID = GetTypeID<void>();
+			m_size = 0;
+		}
+	};
+
+	template <typename T, bool Factory = false>
+	class TVirtualTypeWrapperFactory : public TVirtualTypeWrapperBase<T>
+	{
+	};
+
+	template <typename T>
+	class TVirtualTypeWrapperFactory<T, true> : public TVirtualTypeWrapperBase<T>
+	{
+	public:
+		virtual bool hasFactory() const override { return true; }
+		virtual void* instantiate() const override { return new T(); }
+	};
+
+	template <typename T, bool Factory = false, bool IsClass = false>
+	class TVirtualTypeWrapper : public TVirtualTypeWrapperFactory<T, Factory>
+	{
+	};
+
+	template <typename T, bool Factory>
+	class TVirtualTypeWrapper<T, Factory, true> : public TVirtualTypeWrapperFactory<T, Factory>
+	{
+		virtual Class* unsafeVirtualGetClass(void* _object) const { return reinterpret_cast<T*>(_object)->getClass(); }
+	};
+
 	class MIRROR_API TypeDesc
 	{
 	public:
-		TypeDesc(Type _type, const char* _name, size_t _typeHash);
-		virtual ~TypeDesc(); // NOTE(Remi|2020/04/26): virtual specifier is not needed, but is added to allow the debugger to show inherited types
+		TypeDesc(Type _type, VirtualTypeWrapper* _virtualTypeWrapper);
+		TypeDesc(Type _type, const char* _name, VirtualTypeWrapper* _virtualTypeWrapper);
+		// NOTE(Remi|2020/04/26): virtual specifier is not needed, but is added to allow the debugger to show inherited types
+		virtual ~TypeDesc();
 
 		Type getType() const { return m_type; }
 		const char* getName() const { return m_name; }
-		size_t getTypeHash() const { return m_typeHash; }
+		TypeID getTypeID() const { return m_virtualTypeWrapper->getTypeID(); }
+		size_t getSize() const { return m_virtualTypeWrapper->getSize(); }
+
+		// @TODO(2021/02/15|Remi): Allow the user to choose their allocator
+		bool hasFactory() const;
+		void* instantiate() const;
+
+	protected:
+		const VirtualTypeWrapper* getVirtualTypeWrapper() const { return m_virtualTypeWrapper; }
+		void setName(const char* _name);
 
 	private:
-		Type m_type = Type_none;
 		char* m_name;
-		size_t m_typeHash = 0;
+		Type m_type = Type_none;
+		VirtualTypeWrapper* m_virtualTypeWrapper = nullptr;
 	};
 
 	class MIRROR_API PointerTypeDesc : public TypeDesc
 	{
 	public:
-		PointerTypeDesc(size_t _typeHash, TypeDesc* _subType);
+		PointerTypeDesc(TypeID _subType, VirtualTypeWrapper* _virtualTypeWrapper);
 
-		TypeDesc* getSubType() const { return m_subType; }
+		TypeDesc* getSubType() const;
 
 	private:
-		TypeDesc* m_subType;
+		TypeID m_subType = UNDEFINED_TYPEID;
 	};
 
 	class MIRROR_API FixedSizeArrayTypeDesc : public TypeDesc
 	{
 	public:
-		FixedSizeArrayTypeDesc(size_t _typeHash, TypeDesc* _subType, size_t _size);
+		FixedSizeArrayTypeDesc(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper);
 
-		TypeDesc* getSubType() const { return m_subType; }
-		size_t getSize() const { return m_size; }
+		TypeDesc* getSubType() const;
+		size_t getElementCount() const { return m_elementCount; }
 
 	private:
-		TypeDesc* m_subType;
-		size_t m_size;
+		TypeID m_subType = UNDEFINED_TYPEID;
+		size_t m_elementCount;
 	};
 
 	class MIRROR_API ClassMember
@@ -77,31 +183,30 @@ namespace mirror
 		friend class Class;
 
 	public:
-		ClassMember(const char* _name, size_t _offset, TypeDesc* _type, const char* _metaDataString);
+		ClassMember(const char* _name, size_t _offset, TypeID _type, const char* _metaDataString);
 		~ClassMember();
 
 		const char* getName() const	{ return m_name; }
 		Class* getClass() const { return m_class; }
 		size_t getOffset() const { return m_offset;	}
-		TypeDesc* getType() const { return m_type; }
+		TypeDesc* getType() const;
 
 		void* getInstanceMemberPointer(void* _classInstancePointer) const;
-
-		MetaData* getMetaData(const char* _key) const;
+		const MetaDataSet& GetMetaDataSet() const { return m_metaDataSet; }
 
 	private:
 		Class* m_class = nullptr;
 		char* m_name;
 		size_t m_offset;
-		TypeDesc* m_type = nullptr;
-		std::unordered_map<uint32_t, MetaData> m_metaData;
+		TypeID m_type = UNDEFINED_TYPEID;
+		MetaDataSet m_metaDataSet;
 	};
-
 
 	class MIRROR_API Class : public TypeDesc
 	{
 	public:
-		Class(const char* _name, size_t _typeHash);
+		Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const char* _metaDataString);
+		Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const MetaDataSet& _metaDataSet);
 		virtual ~Class();
 
 		void getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers = true) const;
@@ -115,11 +220,16 @@ namespace mirror
 		void addMember(ClassMember* _member);
 		void addParent(Class* _parent);
 
+		const MetaDataSet& getMetaDataSet() const { return m_metaDataSet; }
+
+		Class* unsafeVirtualGetClass(void* _object) const;
+
 	private:
 		std::set<Class*> m_parents;
 		std::set<Class*> m_children;
 		std::vector<ClassMember*> m_members;
 		std::unordered_map<uint32_t, ClassMember*> m_membersByName;
+		MetaDataSet m_metaDataSet;
 	};
 
 	class MIRROR_API EnumValue
@@ -128,8 +238,8 @@ namespace mirror
 		EnumValue(const char* _name, int64_t _value);
 		~EnumValue();
 		
-		const char* getName() const { return m_name; }
-		int64_t getValue() const { return m_value; }
+		const char* getName() const;
+		int64_t getValue() const;
 
 	private:
 		char* m_name;
@@ -139,7 +249,7 @@ namespace mirror
 	class MIRROR_API Enum : public TypeDesc
 	{
 	public:
-		Enum(const char* _name, size_t _typeHash, TypeDesc* _subType = nullptr);
+		Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeDesc* _subType = nullptr);
 
 		template <typename T>
 		bool getValueFromString(const char* _string, T& _outValue) const
@@ -200,7 +310,8 @@ namespace mirror
 	public:
 		~TypeSet();
 
-		TypeDesc* findTypeByTypeHash(size_t _typeHash);
+		TypeDesc* findTypeByID(TypeID _typeID);
+		TypeDesc* findTypeByName(const char* _name);
 
 		void addType(TypeDesc* _type);
 		void removeType(TypeDesc* _type);
@@ -209,7 +320,8 @@ namespace mirror
 
 	private:
 		std::set<TypeDesc*> m_types;
-		std::unordered_map<size_t, TypeDesc*> m_typesByTypeHash;
+		std::unordered_map<TypeID, TypeDesc*> m_typesByID;
+		std::unordered_map<uint32_t, TypeDesc*> m_typesByName;
 	};
 
 	template <typename T, typename IsArray = void, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
@@ -217,7 +329,8 @@ namespace mirror
 	{
 		static TypeDesc* Get()
 		{
-			return T::GetClass();
+			TypeID typeID = GetTypeID<T>();
+			return GetTypeSet()->findTypeByID(typeID);
 		}
 	};
 
@@ -227,7 +340,7 @@ namespace mirror
 		static TypeDesc* Get()
 		{
 			using type = typename typename std::remove_extent<T>::type;
-			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get(), std::extent<T>::value);
+			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(TypeDescGetter<type>::Get(), std::extent<T>::value , new TVirtualTypeWrapper<T>());
 			return &s_fixedSizeArrayTypeDesc;
 		}
 	};
@@ -237,25 +350,19 @@ namespace mirror
 	{
 		static TypeDesc* Get()
 		{
-			using type = typename std::remove_pointer<T>::type;
-			static PointerTypeDesc s_pointerTypeDesc(typeid(T).hash_code(), TypeDescGetter<type>::Get());
-			return &s_pointerTypeDesc;
+			static PointerTypeDescInitializer<T> s_pointerTypeDescInitializer;
+			/*TypeDesc* typeDesc = GetTypeSet()->findTypeByID(GetTypeID<T>());
+			if (!typeDesc)
+			{
+				using type = typename std::remove_pointer<T>::type;
+				PointerTypeDesc* pointerTypeDesc = new PointerTypeDesc(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
+				GetTypeSet()->addType(pointerTypeDesc);
+				typeDesc = pointerTypeDesc;
+			}*/
+			//return s_pointerTypeDescInitializer->typeDesc;
+			return GetTypeSet()->findTypeByID(GetTypeID<T>());
 		}
 	};
-
-	template <> struct TypeDescGetter<void> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_void, "void", typeid(void).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<bool> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_bool, "bool", typeid(bool).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<char> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_char, "char", typeid(char).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int8, "int8", typeid(int8_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int16, "int16", typeid(int16_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int32, "int32", typeid(int32_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<int64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_int64, "int64", typeid(int64_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint8_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint8, "uint8", typeid(uint8_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint16_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint16, "uint16", typeid(uint16_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint32_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint32, "uint32", typeid(uint32_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<uint64_t> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_uint64, "uint64", typeid(uint64_t).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<float> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_float, "float", typeid(float).hash_code()); return &s_typeDesc; } };
-	template <> struct TypeDescGetter<double> { static TypeDesc* Get() { static TypeDesc s_typeDesc = TypeDesc(Type_double, "double", typeid(double).hash_code()); return &s_typeDesc; } };
 
 	template <typename T>
 	struct TypeDescGetter<T, void, void, std::enable_if_t<std::is_enum<T>::value>>
@@ -274,6 +381,9 @@ namespace mirror
 	};
 
 	template <typename T>
+	TypeDesc* GetTypeDesc() { return TypeDescGetter<T>::Get(); }
+
+	template <typename T>
 	TypeDesc* GetTypeDesc(T&) { return TypeDescGetter<T>::Get(); }
 
 	template <typename T>
@@ -286,6 +396,8 @@ namespace mirror
 		}
 		return nullptr;
 	}
+
+	TypeDesc* FindTypeByName(const char* _name);
 
 	template <typename DestType, typename SourceType, typename IsDestLastPointer = void, typename IsSourceLastPointer = void>
 	struct CastClassesUnpiler
@@ -351,7 +463,7 @@ namespace mirror
 	template <typename F, typename T, T I, T Top>
 	struct FunctionArgumentsUnpiler
 	{
-		static void Unpile(class StaticFunction* _function)
+		static void Unpile(class StaticFunctionTypeDesc* _function)
 		{
 			using ArgumentType = FunctionArgument_T<I, F>;
 			_function->addArgument<ArgumentType>();
@@ -362,7 +474,7 @@ namespace mirror
 	template <typename F, typename T, T I>
 	struct FunctionArgumentsUnpiler<F, T, I, I>
 	{
-		static void Unpile(class StaticFunction* _function) {}
+		static void Unpile(class StaticFunctionTypeDesc* _function) {}
 	};
 
 	template<typename F>
@@ -425,29 +537,31 @@ namespace mirror
 		return CallFunction(_functionPointer, arguments);
 	}
 
-	class MIRROR_API StaticFunction : public TypeDesc
+	// @TODO: refactor this so that we can have a full return type + argument type list at construction time, so that we can generate a unique name
+	// @TODO: add a special initializer for function type desc so that we can manage its responsibility correctly
+	class MIRROR_API StaticFunctionTypeDesc : public TypeDesc
 	{
 	public:
-		StaticFunction(size_t _typeHash)
-			: TypeDesc(Type_StaticFunction, "StaticFunction", _typeHash)
+		StaticFunctionTypeDesc(VirtualTypeWrapper* _virtualTypeWrapper)
+			: TypeDesc(Type_StaticFunction, "StaticFunction", _virtualTypeWrapper)
 		{
 		}
 
 		template <typename T>
 		void setReturnType()
 		{
-			m_returnType = TypeDescGetter<T>::Get();
+			m_returnType = TypeDescGetter<T>::Get()->getTypeID();
 		}
 
 		template <typename T>
 		void addArgument() {
 			TypeDesc* typeDesc = TypeDescGetter<T>::Get();
-			m_argumentTypes.push_back(typeDesc);
+			m_argumentTypes.push_back(typeDesc->getTypeID());
 		}
 
 	private:
-		TypeDesc* m_returnType = nullptr;
-		std::vector<TypeDesc*> m_argumentTypes;
+		TypeID m_returnType = UNDEFINED_TYPEID;
+		std::vector<TypeID> m_argumentTypes;
 	};
 
 	template <typename T>
@@ -455,36 +569,103 @@ namespace mirror
 	{
 		static TypeDesc* Get()
 		{
-			static StaticFunction* s_staticFunction = nullptr;
-			if (s_staticFunction == nullptr)
+			TypeDesc* typeDesc = GetTypeSet()->findTypeByID(GetTypeID<T>());
+			if (typeDesc == nullptr)
 			{
-				size_t typeHash = typeid(T).hash_code();
-				s_staticFunction = new StaticFunction(typeHash);
-
 				using function_pointer_t = typename std::add_pointer<T>::type;
+
+				StaticFunctionTypeDesc* staticFunctionTypeDesc = new StaticFunctionTypeDesc(new TVirtualTypeWrapper<T, false>());
+				GetTypeSet()->addType(staticFunctionTypeDesc);
 
 				// Return type
 				using ReturnType = typename FunctionTraits<function_pointer_t>::result;
-				s_staticFunction->setReturnType<ReturnType>();
+				staticFunctionTypeDesc->setReturnType<ReturnType>();
 
 				// Arguments
 				constexpr size_t argumentsCount = std::tuple_size<FunctionArguments_T<function_pointer_t>>::value;
-				FunctionArgumentsUnpiler<function_pointer_t, std::size_t, 0, argumentsCount>::Unpile(s_staticFunction);
+				FunctionArgumentsUnpiler<function_pointer_t, std::size_t, 0, argumentsCount>::Unpile(staticFunctionTypeDesc);
+
+				typeDesc = staticFunctionTypeDesc;
 			}
-			return s_staticFunction;
+			return typeDesc;
 		}
 	};
 
 	template <typename F>
-	StaticFunction* GetStaticFunctionType(F* _function)
+	StaticFunctionTypeDesc* GetStaticFunctionType(F* _function)
 	{
-		return static_cast<StaticFunction*>(TypeDescGetter<F>::Get());
+		return static_cast<StaticFunctionTypeDesc*>(TypeDescGetter<F>::Get());
 	}
 
-	MIRROR_API TypeSet* GetTypeSet();
+	template <typename T, bool HasFactory = true>
+	struct TypeDescInitializer
+	{
+		TypeDescInitializer(Type _type, const char* _name)
+		{
+			typeDesc = new TypeDesc(_type, _name, new TVirtualTypeWrapper<T, HasFactory>());
+			GetTypeSet()->addType(typeDesc);
+		}
+		~TypeDescInitializer()
+		{
+			GetTypeSet()->removeType(typeDesc);
+			delete typeDesc;
+		}
+		TypeDesc* typeDesc = nullptr;
+	};
+
+	template <typename T, bool HasFactory = true>
+	struct ClassInitializer
+	{
+		ClassInitializer()
+		{
+			clss = T::__MirrorCreateClass();
+			GetTypeSet()->addType(clss);
+		}
+		~ClassInitializer()
+		{
+			GetTypeSet()->removeType(clss);
+			delete clss;
+		}
+		Class* clss = nullptr;
+	};
+
+	template <typename T>
+	struct PointerTypeDescInitializer
+	{
+		PointerTypeDescInitializer()
+		{
+			using type = typename std::remove_pointer<T>::type;
+			typeDesc = new PointerTypeDesc(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
+			GetTypeSet()->addType(typeDesc);
+		}
+		~PointerTypeDescInitializer()
+		{
+			GetTypeSet()->removeType(typeDesc);
+			delete typeDesc;
+		}
+		PointerTypeDesc* typeDesc = nullptr;
+	};
+
+    MIRROR_API TypeSet* GetTypeSet();
 	extern TypeSet g_typeSet;
-	
-	uint32_t Hash32(const void* _data, size_t _size);
-	uint32_t HashCString(const char* _str);
+
+
+#define TYPEDESCINITIALIZER_DECLARE(_type, _hasFactory) extern TypeDescInitializer<_type, _hasFactory> g_##_type##TypeInitializer
+
+	TYPEDESCINITIALIZER_DECLARE(void, false);
+	TYPEDESCINITIALIZER_DECLARE(bool, true);
+	TYPEDESCINITIALIZER_DECLARE(char, true);
+	TYPEDESCINITIALIZER_DECLARE(int8_t, true);
+	TYPEDESCINITIALIZER_DECLARE(int16_t, true);
+	TYPEDESCINITIALIZER_DECLARE(int32_t, true);
+	TYPEDESCINITIALIZER_DECLARE(int64_t, true);
+	TYPEDESCINITIALIZER_DECLARE(uint8_t, true);
+	TYPEDESCINITIALIZER_DECLARE(uint16_t, true);
+	TYPEDESCINITIALIZER_DECLARE(uint32_t, true);
+	TYPEDESCINITIALIZER_DECLARE(uint64_t, true);
+	TYPEDESCINITIALIZER_DECLARE(float, true);
+	TYPEDESCINITIALIZER_DECLARE(double, true);
+
+#undef TYPEDESC_INITIALIZER
 }
 

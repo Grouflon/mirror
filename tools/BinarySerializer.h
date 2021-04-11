@@ -9,7 +9,9 @@ namespace mirror
 {
 	class Class;
 	class TypeDesc;
+	struct MetaDataSet; 
 	class StdVectorTypeDescBase;
+	
 
 	class BinarySerializer
 	{
@@ -58,6 +60,15 @@ namespace mirror
 				size_t size = sizeof(_object);
 				write(&_object, size);
 			}
+
+			template<>
+			void write<std::string>(const std::string& _string)
+			{
+				size_t size = _string.size();
+				write(size);
+				write(_string.data(), size);
+			}
+
 			void write(const void* _data, size_t _size);
 
 			template <typename T>
@@ -68,13 +79,28 @@ namespace mirror
 				size_t size = sizeof(_object);
 				return read(&_object, size);
 			}
+
+			template<>
+			bool read<std::string>(std::string& _string)
+			{
+				size_t size = 0;
+				if (!read(size))
+					return false;
+
+				_string.resize(size);
+				if (!read(const_cast<char*>(_string.data()), size))
+					return false;
+
+				return true;
+			}
+
 			bool read(void* _data, size_t _size);
 
 			void reserve(size_t _size);
 		};
 
-		void _serializeEntry(FDataBuffer* _dataBuffer, const char* _id, void* _object, const TypeDesc* _typeDesc);
-		void _serialize(FDataBuffer* _dataBuffer, void* _object, const TypeDesc* _typeDesc);
+		void _serializeEntry(FDataBuffer* _dataBuffer, const char* _id, void* _object, const TypeDesc* _typeDesc, const MetaDataSet* _metaDataSet = nullptr);
+		void _serialize(FDataBuffer* _dataBuffer, void* _object, const TypeDesc* _typeDesc, const MetaDataSet* _metaDataSet = nullptr);
 		template <typename T>
 		void _serialize(FDataBuffer* _dataBuffer, void* _object)
 		{

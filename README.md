@@ -3,8 +3,9 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 
 ## Manifesto (enforced in this framework, but actually applies to any coding project)
 - Simple ideas should be simple to write.
+- If you are not using it, it should not do anything.
 - Redundant declaration is evil and should be avoided at all cost.
-- A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2020.
+- A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2021.
 
 ## How to install
 ### Using CMAKE
@@ -13,7 +14,7 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 - Add `${MIRROR_INCLUDE_DIRS}` to your target include folders list.
 
 ### Manually
-- Compile mirror.cpp alongside your project
+- Compile mirror_base.cpp,  alongside your project
 - (Optional) Also compile the source files of the tools you intend to use from the "Tools" folder
 
 ## How to declare
@@ -39,6 +40,8 @@ class MyClass : public MyParent
 	MIRROR_CLASS(MyClass)
 	(
 		MIRROR_PARENT(MyParent)
+
+		MIRROR_FACTORY() // Declare a factory that will be able to call the no parameter constructor directly from the Class `instantiate()` method
 
 		MIRROR_MEMBER(a)()
 		MIRROR_MEMBER(b)(Transient)
@@ -77,7 +80,7 @@ MIRROR_ENUM(MyEnum)
 ```
 
 ## How to use
-- Any reflected class gains a public `GetClass()` static function that allow to iterate through reflected members, access their types and find their address on given instances. You can also access it from the oustide with the function `mirror::GetClass<T>()`
+- Any reflected class gains a public `GetClass()` static function that allow to iterate through reflected members, access their types and find their address on given instances. You can also access the reflected type one any type from the oustide with the function `mirror::GetTypeDesc<T>()` or `mirror::GetTypeDesc(myVariable)`
 - Classes inheritance schemes can be checked at runtime by using the `Class::isChildOf` method.
 - A cheap dynamic cast is also available by using the static `mirror::Cast<TargetType>(SourceType)` method.
 - You can access a static function return and arguments types by calling `mirror::GetStaticFunctionType()` on a static function pointer.
