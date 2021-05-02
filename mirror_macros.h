@@ -16,14 +16,14 @@ public:\
 #define __MIRROR_CLASS_CONSTRUCTION(_class, ...)\
 	static ::mirror::Class* GetClass() { return ::mirror::GetClass<_class>(); }\
 	\
-	static ::mirror::ClassInitializer<_class, true> __MirrorInitializer;\
+	static ::mirror::ClassInitializer<_class, false> __MirrorInitializer;\
 	static ::mirror::Class* __MirrorCreateClass()\
 	{\
 		using classType = _class;\
 		\
 		const char* metaDataString = #__VA_ARGS__##"";\
 		mirror::MetaDataSet metaDataSet(metaDataString);\
-		mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType, true, true>();\
+		mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType, false, true>();\
 		::mirror::Class* clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
 		char fakePrototype[sizeof(_class)] = {};\
 		_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
@@ -55,7 +55,7 @@ public:\
 	}
 
 #define MIRROR_CLASS_DEFINITION(_class)\
-	::mirror::ClassInitializer<_class, true> _class::__MirrorInitializer;
+	::mirror::ClassInitializer<_class, false> _class::__MirrorInitializer;
 
 #define MIRROR_ENUM(_enumName)\
 template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDesc* Get() { \
