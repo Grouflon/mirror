@@ -8,7 +8,7 @@
 #include <typeinfo>
 #include <assert.h>
 
-#include <mirror_types.h>
+#include "mirror_types.h"
 
 namespace mirror
 {
