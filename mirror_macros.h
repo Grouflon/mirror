@@ -21,7 +21,7 @@ public:\
 	{\
 		using classType = _class;\
 		\
-		const char* metaDataString = #__VA_ARGS__##"";\
+		const char* metaDataString = #__VA_ARGS__;\
 		mirror::MetaDataSet metaDataSet(metaDataString);\
 		mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType, false, true>();\
 		::mirror::Class* clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
@@ -44,7 +44,7 @@ public:\
 		__MIRROR_MEMBER_CONTENT
 
 #define __MIRROR_MEMBER_CONTENT(...)\
-		const char* metaDataString = #__VA_ARGS__##"";\
+		const char* metaDataString = #__VA_ARGS__;\
 		::mirror::ClassMember* classMember = new ::mirror::ClassMember(memberName, offset, type->getTypeID(), metaDataString);\
 		clss->addMember(classMember);\
 	}
