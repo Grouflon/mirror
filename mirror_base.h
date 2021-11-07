@@ -390,7 +390,7 @@ namespace mirror
 	Class* GetClass()
 	{ 
 		TypeDesc* typeDesc = TypeDescGetter<T>::Get();
-		if (typeDesc->getType() == Type_Class)
+		if (typeDesc != nullptr && typeDesc->getType() == Type_Class)
 		{
 			return static_cast<Class*>(typeDesc);
 		}
