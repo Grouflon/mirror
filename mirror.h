@@ -1,11 +1,13 @@
 #pragma once
 
-#ifndef MIRROR_API
+#ifdef WIN32
 #ifdef MIRROR_EXPORT
 #define MIRROR_API __declspec(dllexport)
 #else
 #define MIRROR_API __declspec(dllimport)
 #endif
+#else
+#define MIRROR_API
 #endif
 
 #pragma warning( push )
