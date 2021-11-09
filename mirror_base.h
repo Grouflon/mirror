@@ -332,7 +332,7 @@ namespace mirror
 	{
 		static TypeDesc* Get()
 		{
-			using type = typename typename std::remove_extent<T>::type;
+			using type = typename std::remove_extent<T>::type;
 			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(TypeDescGetter<type>::Get(), std::extent<T>::value , new TVirtualTypeWrapper<T>());
 			return &s_fixedSizeArrayTypeDesc;
 		}
@@ -576,7 +576,7 @@ namespace mirror
 	{
 		auto arguments = MakeFunctionArgumentsTuple(_functionPointer);
 
-		constexpr size_t argumentsCount = std::tuple_size<FunctionTraits<F>::args>::value;
+		constexpr size_t argumentsCount = std::tuple_size<typename FunctionTraits<F>::args>::value;
 		assert(argumentsCount == _memberCount);
 		FunctionArgumentsFiller<0, argumentsCount>::Fill(_classInstance, _memberNames, _memberCount, arguments);
 
