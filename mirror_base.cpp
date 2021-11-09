@@ -73,15 +73,15 @@ namespace mirror
 
 // ------------- !TOOLS -----------------
 
-	TypeSet g_typeSet;
 	TypeSet* GetTypeSet()
     {
+        static TypeSet g_typeSet;
         return &g_typeSet;
     }
 
 	TypeDesc* FindTypeByName(const char* _name)
 	{
-		return ::mirror::g_typeSet.findTypeByName(_name);
+		return GetTypeSet()->findTypeByName(_name);
 	}
 
 	MetaData::MetaData(const char* _name, const char* _data)
