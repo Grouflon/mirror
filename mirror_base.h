@@ -296,17 +296,7 @@ namespace mirror
 		TypeDesc* m_subType;
 	};
 
-	template<typename T>
-	Enum* GetEnum()
-	{
-		TypeDesc* type = TypeDescGetter<T>::Get();
-		if (type->getType() != Type_Enum)
-			return nullptr;
-
-		return static_cast<Enum*>(type);
-	}
-
-	class MIRROR_API TypeSet
+    class MIRROR_API TypeSet
 	{
 	public:
 		~TypeSet();
@@ -324,6 +314,8 @@ namespace mirror
 		std::unordered_map<TypeID, TypeDesc*> m_typesByID;
 		std::unordered_map<uint32_t, TypeDesc*> m_typesByName;
 	};
+
+    MIRROR_API TypeSet* GetTypeSet();
 
 	template <typename T, typename IsArray = void, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
 	struct TypeDescGetter
@@ -345,6 +337,23 @@ namespace mirror
 			return &s_fixedSizeArrayTypeDesc;
 		}
 	};
+
+    template <typename T>
+    struct PointerTypeDescInitializer
+    {
+        PointerTypeDescInitializer()
+        {
+            using type = typename std::remove_pointer<T>::type;
+            typeDesc = new PointerTypeDesc(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
+            GetTypeSet()->addType(typeDesc);
+        }
+        ~PointerTypeDescInitializer()
+        {
+            GetTypeSet()->removeType(typeDesc);
+            delete typeDesc;
+        }
+        PointerTypeDesc* typeDesc = nullptr;
+    };
 
 	template <typename T>
 	struct TypeDescGetter<T, void, std::enable_if_t<std::is_pointer<T>::value>>
@@ -380,6 +389,16 @@ namespace mirror
 			return nullptr;
 		}
 	};
+
+    template<typename T>
+    Enum* GetEnum()
+    {
+        TypeDesc* type = TypeDescGetter<T>::Get();
+        if (type->getType() != Type_Enum)
+            return nullptr;
+
+        return static_cast<Enum*>(type);
+    }
 
 	template <typename T>
 	TypeDesc* GetTypeDesc() { return TypeDescGetter<T>::Get(); }
@@ -442,7 +461,34 @@ namespace mirror
 		return nullptr;
 	}
 
-	/*
+    // @TODO: refactor this so that we can have a full return type + argument type list at construction time, so that we can generate a unique name
+    // @TODO: add a special initializer for function type desc so that we can manage its responsibility correctly
+    class MIRROR_API StaticFunctionTypeDesc : public TypeDesc
+    {
+    public:
+        StaticFunctionTypeDesc(VirtualTypeWrapper* _virtualTypeWrapper)
+                : TypeDesc(Type_StaticFunction, "StaticFunction", _virtualTypeWrapper)
+        {
+        }
+
+        template <typename T>
+        void setReturnType()
+        {
+            m_returnType = TypeDescGetter<T>::Get()->getTypeID();
+        }
+
+        template <typename T>
+        void addArgument() {
+            TypeDesc* typeDesc = TypeDescGetter<T>::Get();
+            m_argumentTypes.push_back(typeDesc->getTypeID());
+        }
+
+    private:
+        TypeID m_returnType = UNDEFINED_TYPEID;
+        std::vector<TypeID> m_argumentTypes;
+    };
+
+    /*
      * Some templates to do reflection for functions
      */
 	template<typename NotAFunction>
@@ -537,33 +583,6 @@ namespace mirror
 		return CallFunction(_functionPointer, arguments);
 	}
 
-	// @TODO: refactor this so that we can have a full return type + argument type list at construction time, so that we can generate a unique name
-	// @TODO: add a special initializer for function type desc so that we can manage its responsibility correctly
-	class MIRROR_API StaticFunctionTypeDesc : public TypeDesc
-	{
-	public:
-		StaticFunctionTypeDesc(VirtualTypeWrapper* _virtualTypeWrapper)
-			: TypeDesc(Type_StaticFunction, "StaticFunction", _virtualTypeWrapper)
-		{
-		}
-
-		template <typename T>
-		void setReturnType()
-		{
-			m_returnType = TypeDescGetter<T>::Get()->getTypeID();
-		}
-
-		template <typename T>
-		void addArgument() {
-			TypeDesc* typeDesc = TypeDescGetter<T>::Get();
-			m_argumentTypes.push_back(typeDesc->getTypeID());
-		}
-
-	private:
-		TypeID m_returnType = UNDEFINED_TYPEID;
-		std::vector<TypeID> m_argumentTypes;
-	};
-
 	template <typename T>
 	struct TypeDescGetter<T, void, void, void, std::enable_if_t<std::is_function<T>::value>>
 	{
@@ -628,27 +647,6 @@ namespace mirror
 		}
 		Class* clss = nullptr;
 	};
-
-	template <typename T>
-	struct PointerTypeDescInitializer
-	{
-		PointerTypeDescInitializer()
-		{
-			using type = typename std::remove_pointer<T>::type;
-			typeDesc = new PointerTypeDesc(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
-			GetTypeSet()->addType(typeDesc);
-		}
-		~PointerTypeDescInitializer()
-		{
-			GetTypeSet()->removeType(typeDesc);
-			delete typeDesc;
-		}
-		PointerTypeDesc* typeDesc = nullptr;
-	};
-
-    MIRROR_API TypeSet* GetTypeSet();
-	extern TypeSet g_typeSet;
-
 
 #define TYPEDESCINITIALIZER_DECLARE(_type, _hasFactory) extern TypeDescInitializer<_type, _hasFactory> g_##_type##TypeInitializer
 
