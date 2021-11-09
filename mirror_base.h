@@ -24,6 +24,7 @@ namespace mirror
 	struct MIRROR_API MetaData
 	{
 		MetaData(const char* _name, const char* _data);
+		MetaData(const MetaData& _other):MetaData(_other.m_name, _other.m_data){};
 		~MetaData();
 
 		const char* getName() const;

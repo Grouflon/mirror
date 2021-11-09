@@ -85,6 +85,9 @@ namespace mirror
 	}
 
 	MetaData::MetaData(const char* _name, const char* _data)
+    :
+    m_name(nullptr),
+    m_data(nullptr)
 	{
 		ALLOCATE_AND_COPY_STRING(m_name, _name);
         ALLOCATE_AND_COPY_STRING(m_data, _data);
