@@ -479,23 +479,5 @@ namespace mirror
 		return m_value;
 	}
 
-#define TYPEDESCINITIALIZER_DEFINE(_type, _hasFactory, _mirrorType) TypeDescInitializer<_type, _hasFactory> g_##_type##TypeInitializer(_mirrorType, #_type)
-
-	TYPEDESCINITIALIZER_DEFINE(void, false, Type_void);
-	TYPEDESCINITIALIZER_DEFINE(bool, true, Type_bool);
-	TYPEDESCINITIALIZER_DEFINE(char, true, Type_char);
-	TYPEDESCINITIALIZER_DEFINE(int8_t, true, Type_int8);
-	TYPEDESCINITIALIZER_DEFINE(int16_t, true, Type_int16);
-	TYPEDESCINITIALIZER_DEFINE(int32_t, true, Type_int32);
-	TYPEDESCINITIALIZER_DEFINE(int64_t, true, Type_int64);
-	TYPEDESCINITIALIZER_DEFINE(uint8_t, true, Type_uint8);
-	TYPEDESCINITIALIZER_DEFINE(uint16_t, true, Type_uint16);
-	TYPEDESCINITIALIZER_DEFINE(uint32_t, true, Type_uint32);
-	TYPEDESCINITIALIZER_DEFINE(uint64_t, true, Type_uint64);
-	TYPEDESCINITIALIZER_DEFINE(float, true, Type_float);
-	TYPEDESCINITIALIZER_DEFINE(double, true, Type_double);
-
-#undef TYPEDESCINITIALIZER_DEFINE
-
 }
 

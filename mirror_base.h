@@ -667,3 +667,19 @@ namespace mirror
 #undef TYPEDESCINITIALIZER_DECLARE
 }
 
+#define __MIRROR_TYPEDESCINITIALIZER_DEFINE(_type, _hasFactory, _mirrorType) ::mirror::TypeDescInitializer<_type, _hasFactory> mirror::g_##_type##TypeInitializer(_mirrorType, #_type)
+
+#define MIRROR_INITIALIZER \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(void, false, Type_void); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(bool, true, Type_bool); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(char, true, Type_char); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(int8_t, true, Type_int8); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(int16_t, true, Type_int16); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(int32_t, true, Type_int32); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(int64_t, true, Type_int64); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(uint8_t, true, Type_uint8); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(uint16_t, true, Type_uint16); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(uint32_t, true, Type_uint32); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(uint64_t, true, Type_uint64); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(float, true, Type_float); \
+    __MIRROR_TYPEDESCINITIALIZER_DEFINE(double, true, Type_double);
