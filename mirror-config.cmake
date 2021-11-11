@@ -2,12 +2,18 @@
 # This script is intended to be used by a parent CMakeList.txt located somewhere else
 
 # Declare the source files
-file(GLOB_RECURSE MIRROR_SOURCES
+file(GLOB MIRROR_SOURCES
+  "${CMAKE_CURRENT_LIST_DIR}/*.cpp"
+)
+file(GLOB_RECURSE MIRROR_SOURCES_WITH_TOOLS
   "${CMAKE_CURRENT_LIST_DIR}/*.cpp"
 )
 
 # Declare the header files
-file(GLOB_RECURSE MIRROR_HEADERS
+file(GLOB MIRROR_HEADERS
+  "${CMAKE_CURRENT_LIST_DIR}/*.h"
+)
+file(GLOB_RECURSE MIRROR_HEADERS_WITH_TOOLS
   "${CMAKE_CURRENT_LIST_DIR}/*.h"
 )
 
