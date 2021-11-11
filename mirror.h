@@ -10,6 +10,8 @@
     #else
         #define MIRROR_API
     #endif
+#else
+    #define MIRROR_API
 #endif
 
 #pragma warning( push )
