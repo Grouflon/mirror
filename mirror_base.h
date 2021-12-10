@@ -315,7 +315,7 @@ namespace mirror
 		std::unordered_map<uint32_t, TypeDesc*> m_typesByName;
 	};
 
-    MIRROR_API TypeSet* GetTypeSet();
+    MIRROR_API TypeSet& GetTypeSet();
 
 	template <typename T, typename IsArray = void, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
 	struct TypeDescGetter
@@ -323,7 +323,7 @@ namespace mirror
 		static TypeDesc* Get()
 		{
 			TypeID typeID = GetTypeID<T>();
-			return GetTypeSet()->findTypeByID(typeID);
+			return GetTypeSet().findTypeByID(typeID);
 		}
 	};
 
@@ -345,11 +345,11 @@ namespace mirror
         {
             using type = typename std::remove_pointer<T>::type;
             typeDesc = new PointerTypeDesc(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
-            GetTypeSet()->addType(typeDesc);
+            GetTypeSet().addType(typeDesc);
         }
         ~PointerTypeDescInitializer()
         {
-            GetTypeSet()->removeType(typeDesc);
+            GetTypeSet().removeType(typeDesc);
             delete typeDesc;
         }
         PointerTypeDesc* typeDesc = nullptr;
@@ -361,16 +361,16 @@ namespace mirror
 		static TypeDesc* Get()
 		{
 			static PointerTypeDescInitializer<T> s_pointerTypeDescInitializer;
-			/*TypeDesc* typeDesc = GetTypeSet()->findTypeByID(GetTypeID<T>());
+			/*TypeDesc* typeDesc = GetTypeSet().findTypeByID(GetTypeID<T>());
 			if (!typeDesc)
 			{
 				using type = typename std::remove_pointer<T>::type;
 				PointerTypeDesc* pointerTypeDesc = new PointerTypeDesc(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
-				GetTypeSet()->addType(pointerTypeDesc);
+				GetTypeSet().addType(pointerTypeDesc);
 				typeDesc = pointerTypeDesc;
 			}*/
 			//return s_pointerTypeDescInitializer->typeDesc;
-			return GetTypeSet()->findTypeByID(GetTypeID<T>());
+			return GetTypeSet().findTypeByID(GetTypeID<T>());
 		}
 	};
 
@@ -588,13 +588,13 @@ namespace mirror
 	{
 		static TypeDesc* Get()
 		{
-			TypeDesc* typeDesc = GetTypeSet()->findTypeByID(GetTypeID<T>());
+			TypeDesc* typeDesc = GetTypeSet().findTypeByID(GetTypeID<T>());
 			if (typeDesc == nullptr)
 			{
 				using function_pointer_t = typename std::add_pointer<T>::type;
 
 				StaticFunctionTypeDesc* staticFunctionTypeDesc = new StaticFunctionTypeDesc(new TVirtualTypeWrapper<T, false>());
-				GetTypeSet()->addType(staticFunctionTypeDesc);
+				GetTypeSet().addType(staticFunctionTypeDesc);
 
 				// Return type
 				using ReturnType = typename FunctionTraits<function_pointer_t>::result;
@@ -622,11 +622,11 @@ namespace mirror
 		TypeDescInitializer(Type _type, const char* _name)
 		{
 			typeDesc = new TypeDesc(_type, _name, new TVirtualTypeWrapper<T, HasFactory>());
-			GetTypeSet()->addType(typeDesc);
+			GetTypeSet().addType(typeDesc);
 		}
 		~TypeDescInitializer()
 		{
-			GetTypeSet()->removeType(typeDesc);
+			GetTypeSet().removeType(typeDesc);
 			delete typeDesc;
 		}
 		TypeDesc* typeDesc = nullptr;
@@ -638,15 +638,18 @@ namespace mirror
 		ClassInitializer()
 		{
 			clss = T::__MirrorCreateClass();
-			GetTypeSet()->addType(clss);
+			GetTypeSet().addType(clss);
 		}
 		~ClassInitializer()
 		{
-			GetTypeSet()->removeType(clss);
+			GetTypeSet().removeType(clss);
 			delete clss;
 		}
 		Class* clss = nullptr;
 	};
+
+
+extern TypeSet* g_typeSetPtr;
 
 #define TYPEDESCINITIALIZER_DECLARE(_type, _hasFactory) extern TypeDescInitializer<_type, _hasFactory> g_##_type##TypeInitializer
 
@@ -666,20 +669,3 @@ namespace mirror
 
 #undef TYPEDESCINITIALIZER_DECLARE
 }
-
-#define __MIRROR_TYPEDESCINITIALIZER_DEFINE(_type, _hasFactory, _mirrorType) ::mirror::TypeDescInitializer<_type, _hasFactory> mirror::g_##_type##TypeInitializer(_mirrorType, #_type)
-
-#define MIRROR_INITIALIZER \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(void, false, Type_void); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(bool, true, Type_bool); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(char, true, Type_char); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(int8_t, true, Type_int8); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(int16_t, true, Type_int16); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(int32_t, true, Type_int32); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(int64_t, true, Type_int64); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(uint8_t, true, Type_uint8); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(uint16_t, true, Type_uint16); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(uint32_t, true, Type_uint32); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(uint64_t, true, Type_uint64); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(float, true, Type_float); \
-    __MIRROR_TYPEDESCINITIALIZER_DEFINE(double, true, Type_double);

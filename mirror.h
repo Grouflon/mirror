@@ -1,18 +1,23 @@
 #pragma once
 
-#ifdef MIRROR_DYNAMICALLY_LINKED
-    #ifdef WIN32
-        #ifdef MIRROR_EXPORT
-            #define MIRROR_API __declspec(dllexport)
-        #else
-            #define MIRROR_API __declspec(dllimport)
-        #endif
-    #else
-        #define MIRROR_API
-    #endif
+
+// Dll import/export markup
+#ifdef MIRROR_EXPORT
+	#ifdef _WIN32
+    	#define MIRROR_API __declspec(dllexport)
+	#else
+    	#define MIRROR_API // Not done yet
+	#endif
+#elif MIRROR_IMPORT
+	#ifdef _WIN32
+    	#define MIRROR_API __declspec(dllimport)
+	#else
+    	#define MIRROR_API // Not done yet
+	#endif
 #else
-    #define MIRROR_API
+    #define MIRROR_API	
 #endif
+
 
 #pragma warning( push )
 #pragma warning( disable : 4251 ) // deactivate '...': class '...' needs to have dll-interface to be used by clients of class '...' for std containers until I make my own some day. The code will be duplicated but it should be fine

@@ -16,6 +16,8 @@ namespace mirror
 #define OFFSET_BASIS	2166136261
 #define FNV_PRIME		16777619
 
+	TypeSet* g_typeSetPtr = nullptr;
+
 	uint32_t Hash32(const void* _data, size_t _size)
 	{
 		if (_size == 0)
@@ -73,21 +75,21 @@ namespace mirror
 
 // ------------- !TOOLS -----------------
 
-	TypeSet* GetTypeSet()
+	TypeSet& GetTypeSet()
     {
-        static TypeSet g_typeSet;
-        return &g_typeSet;
+		if (g_typeSetPtr == nullptr)
+		{
+			g_typeSetPtr = new TypeSet(); // This will leak for now, but it's not a big deal
+		}
+        return *g_typeSetPtr;
     }
 
 	TypeDesc* FindTypeByName(const char* _name)
 	{
-		return GetTypeSet()->findTypeByName(_name);
+		return GetTypeSet().findTypeByName(_name);
 	}
 
 	MetaData::MetaData(const char* _name, const char* _data)
-    :
-    m_name(nullptr),
-    m_data(nullptr)
 	{
 		ALLOCATE_AND_COPY_STRING(m_name, _name);
         ALLOCATE_AND_COPY_STRING(m_data, _data);
@@ -242,7 +244,7 @@ namespace mirror
 
 	TypeDesc* ClassMember::getType() const
 	{
-		return GetTypeSet()->findTypeByID(m_type);
+		return GetTypeSet().findTypeByID(m_type);
 	}
 
 	void* ClassMember::getInstanceMemberPointer(void* _classInstancePointer) const
@@ -416,10 +418,10 @@ namespace mirror
 		: TypeDesc(Type_Pointer, "", _virtualTypeWrapper)
 		, m_subType(_subType)
 	{
-		setName((std::string("pointer_") + GetTypeSet()->findTypeByID(_subType)->getName()).c_str());
+		setName((std::string("pointer_") + GetTypeSet().findTypeByID(_subType)->getName()).c_str());
 	}
 
-	TypeDesc* PointerTypeDesc::getSubType() const { return GetTypeSet()->findTypeByID(m_subType); }
+	TypeDesc* PointerTypeDesc::getSubType() const { return GetTypeSet().findTypeByID(m_subType); }
 
 
 	FixedSizeArrayTypeDesc::FixedSizeArrayTypeDesc(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper)
@@ -432,7 +434,7 @@ namespace mirror
 
 	TypeDesc* FixedSizeArrayTypeDesc::getSubType() const
 	{
-		return GetTypeSet()->findTypeByID(m_subType);
+		return GetTypeSet().findTypeByID(m_subType);
 	}
 
 	Enum::Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeDesc* _subType)
@@ -478,6 +480,24 @@ namespace mirror
 	{
 		return m_value;
 	}
+
+	#define __MIRROR_TYPEDESCINITIALIZER_DEFINE(_type, _hasFactory, _mirrorType) ::mirror::TypeDescInitializer<_type, _hasFactory> mirror::g_##_type##TypeInitializer(_mirrorType, #_type)
+
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(void, false, Type_void);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(bool, true, Type_bool);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(char, true, Type_char);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(int8_t, true, Type_int8);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(int16_t, true, Type_int16);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(int32_t, true, Type_int32);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(int64_t, true, Type_int64);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint8_t, true, Type_uint8);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint16_t, true, Type_uint16);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint32_t, true, Type_uint32);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint64_t, true, Type_uint64);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(float, true, Type_float);
+		__MIRROR_TYPEDESCINITIALIZER_DEFINE(double, true, Type_double);
+
+	#undef __MIRROR_TYPEDESCINITIALIZER_DEFINE
 
 }
 
