@@ -2,13 +2,34 @@
 
 #include "mirror_base.h"
 
+// Disable some warnings when expanding macros
+#if defined(__clang__)
+#define MIRROR_PUSH_DISABLE_WARNINGS \
+_Pragma("clang diagnostic push") \
+_Pragma("clang diagnostic ignored \"-Winconsistent-missing-override\"")
+#define MIRROR_POP_DISABLE_WARNINGS \
+_Pragma("clang diagnostic pop")
+#elif defined(__GNUC__)
+#define MIRROR_PUSH_DISABLE_WARNINGS \
+_Pragma("GCC diagnostic push") \
+_Pragma("GCC diagnostic ignored \"-Winconsistent-missing-override\"")
+#define MIRROR_POP_DISABLE_WARNINGS \
+_Pragma("GCC diagnostic pop")
+#else
+#define MIRROR_PUSH_DISABLE_WARNINGS
+#define MIRROR_POP_DISABLE_WARNINGS
+#endif
+
+
 #define MIRROR_CLASS(_class, ...)\
+MIRROR_PUSH_DISABLE_WARNINGS \
 public:\
 	virtual ::mirror::Class* getClass() const { return _class::GetClass(); }\
 	__MIRROR_CLASS_CONSTRUCTION(_class, __VA_ARGS__)
 
 
 #define MIRROR_CLASS_NOVIRTUAL(_class, ...)\
+MIRROR_PUSH_DISABLE_WARNINGS \
 public:\
 	::mirror::Class* getClass() const { return _class::GetClass(); }\
 	__MIRROR_CLASS_CONSTRUCTION(_class, __VA_ARGS__)
@@ -27,6 +48,7 @@ public:\
 		::mirror::Class* clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
 		char fakePrototype[sizeof(_class)] = {};\
 		_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
+		(void)prototypePtr;\
 		{\
 		__MIRROR_CLASS_CONTENT
 
@@ -34,7 +56,8 @@ public:\
 			__VA_ARGS__\
 		}\
 		return clss;\
-	}
+	}\
+	MIRROR_POP_DISABLE_WARNINGS
 
 #define MIRROR_MEMBER(_memberName)\
 	{\

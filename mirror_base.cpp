@@ -136,7 +136,6 @@ namespace mirror
 		size_t keyLen = 0;
 		const char* value = nullptr;
 		size_t valueLen = 0;
-		int mode = 0;
 		for (const char* cur = _metaDataString; cur <= _metaDataString + len; ++cur)
 		{
 			if (*cur == ',' || cur == _metaDataString + len)
@@ -481,7 +480,7 @@ namespace mirror
 		return m_value;
 	}
 
-	#define __MIRROR_TYPEDESCINITIALIZER_DEFINE(_type, _hasFactory, _mirrorType) ::mirror::TypeDescInitializer<_type, _hasFactory> mirror::g_##_type##TypeInitializer(_mirrorType, #_type)
+	#define __MIRROR_TYPEDESCINITIALIZER_DEFINE(_type, _hasFactory, _mirrorType) ::mirror::TypeDescInitializer<_type, _hasFactory> g_##_type##TypeInitializer(_mirrorType, #_type)
 
 		__MIRROR_TYPEDESCINITIALIZER_DEFINE(void, false, Type_void);
 		__MIRROR_TYPEDESCINITIALIZER_DEFINE(bool, true, Type_bool);

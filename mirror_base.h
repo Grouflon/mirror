@@ -58,6 +58,8 @@ namespace mirror
 	class MIRROR_API VirtualTypeWrapper
 	{
 	public:
+		virtual ~VirtualTypeWrapper() {}
+		
 		TypeID getTypeID() const { return m_typeID; }
 		size_t getSize() const { return m_size; }
 

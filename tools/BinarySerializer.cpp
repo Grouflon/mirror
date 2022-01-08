@@ -174,7 +174,7 @@ namespace mirror
 
 			if (m_isWriting)
 			{
-				int64_t value;
+				int64_t value = 0;
 				switch (enumTypeDesc->getSubType()->getType())
 				{
 				case Type_int8: value = static_cast<int64_t>(*reinterpret_cast<int8_t*>(_object)); break;
@@ -194,7 +194,7 @@ namespace mirror
 			else if (m_isReading)
 			{
 				char* str = reinterpret_cast<char*>(_dataBuffer->data + _dataBuffer->cursor);
-				int64_t value;
+				int64_t value = 0;
 				enumTypeDesc->getValueFromString(str, value);
 
 				switch (enumTypeDesc->getSubType()->getType())
@@ -203,6 +203,7 @@ namespace mirror
 				case Type_int16: *reinterpret_cast<int16_t*>(_object) = static_cast<int16_t>(value); break;
 				case Type_int32: *reinterpret_cast<int32_t*>(_object) = static_cast<int32_t>(value); break;
 				case Type_int64: *reinterpret_cast<int64_t*>(_object) = static_cast<int64_t>(value); break;
+				default: assert(false); break;
 				}
 			}
 		}
