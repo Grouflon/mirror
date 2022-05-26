@@ -6,6 +6,7 @@
 #include <set>
 #include <type_traits>
 #include <typeinfo>
+#include <string>
 #include <assert.h>
 
 #include "mirror_types.h"
@@ -454,10 +455,13 @@ namespace mirror
 		Class* sourceClass = nullptr;
 		if (CastClassesUnpiler<DestType, SourceType>::Unpile(&destClass, &sourceClass))
 		{
-			if (destClass->isChildOf(sourceClass) // upcast
-				|| sourceClass->isChildOf(destClass)) // downcast
+			if (destClass != nullptr && sourceClass != nullptr)
 			{
-				return reinterpret_cast<DestType>(_o);
+				if (destClass->isChildOf(sourceClass) // upcast
+				|| sourceClass->isChildOf(destClass)) // downcast
+				{
+					return reinterpret_cast<DestType>(_o);
+				}
 			}
 		}
 		return nullptr;
