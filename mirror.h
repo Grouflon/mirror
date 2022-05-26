@@ -2,20 +2,22 @@
 
 
 // Dll import/export markup
-#ifdef MIRROR_EXPORT
-	#ifdef _WIN32
-    	#define MIRROR_API __declspec(dllexport)
+#ifndef MIRROR_API
+	#ifdef MIRROR_EXPORT
+		#ifdef _WIN32
+	    	#define MIRROR_API __declspec(dllexport)
+		#else
+	    	#define MIRROR_API // Not done yet
+		#endif
+	#elif MIRROR_IMPORT
+		#ifdef _WIN32
+	    	#define MIRROR_API __declspec(dllimport)
+		#else
+	    	#define MIRROR_API // Not done yet
+		#endif
 	#else
-    	#define MIRROR_API // Not done yet
+	    #define MIRROR_API	
 	#endif
-#elif MIRROR_IMPORT
-	#ifdef _WIN32
-    	#define MIRROR_API __declspec(dllimport)
-	#else
-    	#define MIRROR_API // Not done yet
-	#endif
-#else
-    #define MIRROR_API	
 #endif
 
 
