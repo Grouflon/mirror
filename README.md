@@ -1,21 +1,20 @@
 # mirror
-mirror is a lightweight C++ reflection framework that aims at providing a simple and expressive way of adding reflection/introspection to a C++ project.
+mirror is a lightweight C++ reflection library that aims at providing a simple and expressive way of adding reflection/introspection to a C++ project.
 
-## Manifesto (enforced in this framework, but actually applies to any coding project)
+## Manifesto (enforced in this library, but actually applies to any coding project)
 - Simple ideas should be simple to write.
-- If you are not using it, it should not do anything.
+- If you are not using it, it should not do or cost anything.
 - Redundant declaration is evil and should be avoided at all cost.
-- A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2021.
+- A puppy dies each time a C++ developer writes yet another piece of non-generic serialization code in 2022.
 
 ## How to install
-### Using CMAKE
-- Add `find_package(MIRROR REQUIRED HINTS "./<path-to-mirror-relative-to-your-cmakelists-file>")` in your CMakeLists.txt
-- Add `${MIRROR_SOURCES}` to your target sources list.
-- Add `${MIRROR_INCLUDE_DIRS}` to your target include folders list.
-
-### Manually
-- Compile mirror_base.cpp,  alongside your project
-- (Optional) Also compile the source files of the tools you intend to use from the "Tools" folder
+This library is loosely inspired from [single header stb libraries](https://github.com/nothings/stb).
+All the library is contained in the header file and the .h that you should include as any header when you want to use the library.
+In addition to that, you should select exactly one C++ source file that actually instantiates the code. This file should define the following macro before including the header
+```C++
+#define MIRROR_IMPLEMENTATION
+#include <mirror.h>
+```
 
 ## How to declare
 - Include '<mirror.h>' in the header of the class you want to reflect.
@@ -26,6 +25,8 @@ mirror is a lightweight C++ reflection framework that aims at providing a simple
 - Here is an example declaration:
 
 ```C++
+#include <mirror.h>
+
 class MyClass : public MyParent
 {
 	bool a;
@@ -40,8 +41,6 @@ class MyClass : public MyParent
 	MIRROR_CLASS(MyClass)
 	(
 		MIRROR_PARENT(MyParent)
-
-		MIRROR_FACTORY() // Declare a factory that will be able to call the no parameter constructor directly from the Class `instantiate()` method
 
 		MIRROR_MEMBER(a)()
 		MIRROR_MEMBER(b)(Transient)
@@ -85,11 +84,6 @@ MIRROR_ENUM(MyEnum)
 - A cheap dynamic cast is also available by using the static `mirror::Cast<TargetType>(SourceType)` method.
 - You can access a static function return and arguments types by calling `mirror::GetStaticFunctionType()` on a static function pointer.
 - You can access an enum type, convert value to string, string to value and access a list of the enum's values with the templated method `mirror::GetEnum<MyEnum>()`.
-
-## Tools
-Mirror comes with a set of tools that works on reflected classes and can leverage the power of reflection.
-### Tools/BinarySerializer
-A straightforward binary serializer that automatically serializes/deserializes your reflected files to/from binary buffers and files.
 
 ## Contributing
 mirror is till a very early prototype, you can contribute on providing me feedback and use cases, that would actually help a lot.
