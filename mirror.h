@@ -28,16 +28,16 @@
 namespace mirror {
 
 	//-----------------------------------------------------------------------------
-	// Forward Declarations
+	// Forward Declarations & Types
 	//-----------------------------------------------------------------------------
 	typedef size_t TypeID;
 	class TypeSet;
 	class TypeDesc;
 	class Class;
 	class Enum;
-	class PointerTypeDesc;
-	class StaticFunctionTypeDesc;
-	class FixedSizeArrayTypeDesc;
+	class Pointer;
+	class StaticFunction;
+	class FixedSizeArray;
 	class ClassMember;
 	class EnumValue;
 	class VirtualTypeWrapper;
@@ -105,6 +105,13 @@ namespace mirror {
 
 	MIRROR_API TypeDesc* FindTypeByName(const char* _name);
 
+	MIRROR_API TypeDesc* AsTypeDesc(TypeID _id);
+	MIRROR_API Class* AsClass(TypeID _id);
+	MIRROR_API Enum* AsEnum(TypeID _id);
+	MIRROR_API Pointer* AsPointer(TypeID _id);
+	MIRROR_API StaticFunction* AsStaticFunction(TypeID _id);
+	MIRROR_API FixedSizeArray* AsFixedSizeArray(TypeID _id);
+
     MIRROR_API TypeSet& GetTypeSet();
 
 	//-----------------------------------------------------------------------------
@@ -147,18 +154,22 @@ namespace mirror {
 	public:
 		~TypeSet();
 
-		TypeDesc* findTypeByID(TypeID _typeID);
-		TypeDesc* findTypeByName(const char* _name);
+		TypeDesc* findTypeByID(TypeID _typeID) const;
+		TypeDesc* findTypeByName(const char* _name) const;
 
 		void addType(TypeDesc* _type);
 		void removeType(TypeDesc* _type);
 
 		const std::set<TypeDesc*>& getTypes() const;
 
-	private:
+		void resolveTypes();
+
+	//private:
 		std::set<TypeDesc*> m_types;
 		std::unordered_map<TypeID, TypeDesc*> m_typesByID;
 		std::unordered_map<uint32_t, TypeDesc*> m_typesByName;
+
+		bool m_resolved = false;
 	};
 
 	extern TypeSet* g_typeSetPtr;
@@ -175,15 +186,30 @@ namespace mirror {
 		TypeID getTypeID() const;
 		size_t getSize() const;
 
+		const Class* asClass() const;
+		const Enum* asEnum() const;
+		const Pointer* asPointer() const;
+		const StaticFunction* asStaticFunction() const;
+		const FixedSizeArray* asFixedSizeArray() const;
+
+		Class* asClass();
+		Enum* asEnum();
+		Pointer* asPointer();
+		StaticFunction* asStaticFunction();
+		FixedSizeArray* asFixedSizeArray();
+
 		// @TODO(2021/02/15|Remi): Allow the user to choose their allocator
 		bool hasFactory() const;
 		void* instantiate() const;
 
 	// internal
 		void setName(const char* _name);
+
+		virtual void shutdown();
+		virtual void init();
+
 		TypeDesc(Type _type, VirtualTypeWrapper* _virtualTypeWrapper);
 		TypeDesc(Type _type, const char* _name, VirtualTypeWrapper* _virtualTypeWrapper);
-		// NOTE(Remi|2020/04/26): virtual specifier is not needed, but is added to allow the debugger to show inherited types
 		virtual ~TypeDesc();
 
 		char* m_name;
@@ -220,8 +246,8 @@ namespace mirror {
 		void getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers = true) const;
 		ClassMember* findMemberByName(const char* _name, bool _includeInheritedMembers = true) const;
 
-		const std::set<Class*>& getParents() const;
-		const std::set<Class*>& getChildren() const;
+		const std::set<TypeID>& getParents() const;
+		const std::set<TypeID>& getChildren() const;
 
 		bool isChildOf(const Class* _class, bool _checkSelf = true) const;
 
@@ -231,14 +257,17 @@ namespace mirror {
 
 	// internal
 		void addMember(ClassMember* _member);
-		void addParent(Class* _parent);
+		void addParent(TypeID _parent);
 		Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const char* _metaDataString);
 		Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const MetaDataSet& _metaDataSet);
+
+		virtual void shutdown() override;
+		virtual void init() override;
+
 		virtual ~Class();
 
-		// @TODO(remi): replace those pointers by TypeIDs
-		std::set<Class*> m_parents;
-		std::set<Class*> m_children;
+		std::set<TypeID> m_parents;
+		std::set<TypeID> m_children;
 		std::vector<ClassMember*> m_members;
 		std::unordered_map<uint32_t, ClassMember*> m_membersByName;
 		MetaDataSet m_metaDataSet;
@@ -248,7 +277,7 @@ namespace mirror {
 	{
 	public:
 		const char* getName() const;
-		Class* getClass() const;
+		Class* getOwnerClass() const;
 		size_t getOffset() const;
 		TypeDesc* getType() const;
 
@@ -259,7 +288,7 @@ namespace mirror {
 		ClassMember(const char* _name, size_t _offset, TypeID _type, const char* _metaDataString);
 		~ClassMember();
 
-		Class* m_class = nullptr;
+		Class* m_ownerClass = nullptr;
 		char* m_name;
 		size_t m_offset;
 		TypeID m_type = UNDEFINED_TYPEID;
@@ -279,12 +308,12 @@ namespace mirror {
 
 	// internal
 		void addValue(EnumValue* _value);
-		Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeDesc* _subType = nullptr);
+		Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeID _subType = UNDEFINED_TYPEID);
 
 		std::vector<EnumValue*> m_values;
 		std::unordered_map<size_t, EnumValue*> m_valuesByNameHash;
 
-		TypeDesc* m_subType;
+		TypeID m_subType;
 	};
 
 	class MIRROR_API EnumValue
@@ -302,19 +331,19 @@ namespace mirror {
 	};
 
 	// --- Pointer
-	class MIRROR_API PointerTypeDesc : public TypeDesc
+	class MIRROR_API Pointer : public TypeDesc
 	{
 	public:
 		TypeDesc* getSubType() const;
 
 	// internal
-		PointerTypeDesc(TypeID _subType, VirtualTypeWrapper* _virtualTypeWrapper);
+		Pointer(TypeID _subType, VirtualTypeWrapper* _virtualTypeWrapper);
 
 		TypeID m_subType = UNDEFINED_TYPEID;
 	};
 
 	// --- Fixed Size Array
-	class MIRROR_API FixedSizeArrayTypeDesc : public TypeDesc
+	class MIRROR_API FixedSizeArray : public TypeDesc
 	{
 	public:
 
@@ -322,7 +351,7 @@ namespace mirror {
 		size_t getElementCount() const { return m_elementCount; }
 
 	// internal
-		FixedSizeArrayTypeDesc(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper);
+		FixedSizeArray(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper);
 
 		TypeID m_subType = UNDEFINED_TYPEID;
 		size_t m_elementCount;
@@ -410,7 +439,7 @@ public:\
 
 #define MIRROR_PARENT(_parentClass)\
 	{\
-		clss->addParent(::mirror::GetClass<_parentClass>());\
+		clss->addParent(::mirror::GetTypeID<_parentClass>());\
 	}
 
 #define MIRROR_CLASS_DEFINITION(_class)\
@@ -442,7 +471,7 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 			case 4: subType = ::mirror::TypeDescGetter<int32_t>::Get(); break; \
 			case 8: subType = ::mirror::TypeDescGetter<int64_t>::Get(); break; \
 		} \
-		s_enum = new ::mirror::Enum(#_enumName, new TVirtualTypeWrapper<enumType>(), subType); \
+		s_enum = new ::mirror::Enum(#_enumName, new TVirtualTypeWrapper<enumType>(), subType->getTypeID()); \
 		__MIRROR_ENUM_CONTENT
 
 #define MIRROR_ENUM_CLASS_VALUE(_enumValue)\
@@ -489,26 +518,26 @@ namespace mirror {
 		static TypeDesc* Get()
 		{
 			using type = typename std::remove_extent<T>::type;
-			static FixedSizeArrayTypeDesc s_fixedSizeArrayTypeDesc(TypeDescGetter<type>::Get(), std::extent<T>::value , new TVirtualTypeWrapper<T>());
-			return &s_fixedSizeArrayTypeDesc;
+			static FixedSizeArray s_FixedSizeArray(TypeDescGetter<type>::Get(), std::extent<T>::value , new TVirtualTypeWrapper<T>());
+			return &s_FixedSizeArray;
 		}
 	};
 
     template <typename T>
-    struct PointerTypeDescInitializer
+    struct PointerInitializer
     {
-        PointerTypeDescInitializer()
+        PointerInitializer()
         {
             using type = typename std::remove_pointer<T>::type;
-            typeDesc = new PointerTypeDesc(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
+            typeDesc = new Pointer(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
             GetTypeSet().addType(typeDesc);
         }
-        ~PointerTypeDescInitializer()
+        ~PointerInitializer()
         {
             GetTypeSet().removeType(typeDesc);
             delete typeDesc;
         }
-        PointerTypeDesc* typeDesc = nullptr;
+        Pointer* typeDesc = nullptr;
     };
 
 	template <typename T>
@@ -516,16 +545,16 @@ namespace mirror {
 	{
 		static TypeDesc* Get()
 		{
-			static PointerTypeDescInitializer<T> s_pointerTypeDescInitializer;
+			static PointerInitializer<T> s_PointerInitializer;
 			/*TypeDesc* typeDesc = GetTypeSet().findTypeByID(GetTypeID<T>());
 			if (!typeDesc)
 			{
 				using type = typename std::remove_pointer<T>::type;
-				PointerTypeDesc* pointerTypeDesc = new PointerTypeDesc(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
-				GetTypeSet().addType(pointerTypeDesc);
-				typeDesc = pointerTypeDesc;
+				Pointer* Pointer = new Pointer(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
+				GetTypeSet().addType(Pointer);
+				typeDesc = Pointer;
 			}*/
-			//return s_pointerTypeDescInitializer->typeDesc;
+			//return s_PointerInitializer->typeDesc;
 			return GetTypeSet().findTypeByID(GetTypeID<T>());
 		}
 	};
@@ -800,10 +829,10 @@ namespace mirror {
 	// === Static Function (WIP) ===
 	// @TODO: refactor this so that we can have a full return type + argument type list at construction time, so that we can generate a unique name
     // @TODO: add a special initializer for function type desc so that we can manage its responsibility correctly
-    class MIRROR_API StaticFunctionTypeDesc : public TypeDesc
+    class MIRROR_API StaticFunction : public TypeDesc
     {
     public:
-        StaticFunctionTypeDesc(VirtualTypeWrapper* _virtualTypeWrapper)
+        StaticFunction(VirtualTypeWrapper* _virtualTypeWrapper)
                 : TypeDesc(Type_StaticFunction, "StaticFunction", _virtualTypeWrapper)
         {
         }
@@ -846,7 +875,7 @@ namespace mirror {
 	template <typename F, typename T, T I, T Top>
 	struct FunctionArgumentsUnpiler
 	{
-		static void Unpile(class StaticFunctionTypeDesc* _function)
+		static void Unpile(class StaticFunction* _function)
 		{
 			using ArgumentType = FunctionArgument_T<I, F>;
 			_function->addArgument<ArgumentType>();
@@ -857,7 +886,7 @@ namespace mirror {
 	template <typename F, typename T, T I>
 	struct FunctionArgumentsUnpiler<F, T, I, I>
 	{
-		static void Unpile(class StaticFunctionTypeDesc* _function) {}
+		static void Unpile(class StaticFunction* _function) {}
 	};
 
 	template<typename F>
@@ -930,27 +959,27 @@ namespace mirror {
 			{
 				using function_pointer_t = typename std::add_pointer<T>::type;
 
-				StaticFunctionTypeDesc* staticFunctionTypeDesc = new StaticFunctionTypeDesc(new TVirtualTypeWrapper<T, false>());
-				GetTypeSet().addType(staticFunctionTypeDesc);
+				StaticFunction* StaticFunction = new StaticFunction(new TVirtualTypeWrapper<T, false>());
+				GetTypeSet().addType(StaticFunction);
 
 				// Return type
 				using ReturnType = typename FunctionTraits<function_pointer_t>::result;
-				staticFunctionTypeDesc->setReturnType<ReturnType>();
+				StaticFunction->setReturnType<ReturnType>();
 
 				// Arguments
 				constexpr size_t argumentsCount = std::tuple_size<FunctionArguments_T<function_pointer_t>>::value;
-				FunctionArgumentsUnpiler<function_pointer_t, std::size_t, 0, argumentsCount>::Unpile(staticFunctionTypeDesc);
+				FunctionArgumentsUnpiler<function_pointer_t, std::size_t, 0, argumentsCount>::Unpile(StaticFunction);
 
-				typeDesc = staticFunctionTypeDesc;
+				typeDesc = StaticFunction;
 			}
 			return typeDesc;
 		}
 	};
 
 	template <typename F>
-	StaticFunctionTypeDesc* GetStaticFunctionType(F* _function)
+	StaticFunction* GetStaticFunctionType(F* _function)
 	{
-		return static_cast<StaticFunctionTypeDesc*>(TypeDescGetter<F>::Get());
+		return static_cast<StaticFunction*>(TypeDescGetter<F>::Get());
 	}
 
 } // namespace mirror
@@ -1005,6 +1034,41 @@ namespace mirror {
 	TypeDesc* FindTypeByName(const char* _name)
 	{
 		return GetTypeSet().findTypeByName(_name);
+	}
+
+	TypeDesc* AsTypeDesc(TypeID _id)
+	{
+		return GetTypeSet().findTypeByID(_id);
+	}
+
+	Class* AsClass(TypeID _id)
+	{
+		TypeDesc* type = AsTypeDesc(_id);
+		return type->asClass();
+	}
+
+	Enum* AsEnum(TypeID _id)
+	{
+		TypeDesc* type = AsTypeDesc(_id);
+		return type->asEnum();
+	}
+
+	Pointer* AsPointer(TypeID _id)
+	{
+		TypeDesc* type = AsTypeDesc(_id);
+		return type->asPointer();
+	}
+
+	StaticFunction* AsStaticFunction(TypeID _id)
+	{
+		TypeDesc* type = AsTypeDesc(_id);
+		return type->asStaticFunction();
+	}
+
+	FixedSizeArray* AsFixedSizeArray(TypeID _id)
+	{
+		TypeDesc* type = AsTypeDesc(_id);
+		return type->asFixedSizeArray();
 	}
 
 	TypeSet& GetTypeSet()
@@ -1180,13 +1244,13 @@ namespace mirror {
 		m_typesByName.clear();
 	}
 
-	TypeDesc* TypeSet::findTypeByID(TypeID _typeID)
+	TypeDesc* TypeSet::findTypeByID(TypeID _typeID) const
 	{
 		auto it = m_typesByID.find(_typeID);
 		return it != m_typesByID.end() ? it->second : nullptr;
 	}
 
-	mirror::TypeDesc* TypeSet::findTypeByName(const char* _name)
+	mirror::TypeDesc* TypeSet::findTypeByName(const char* _name) const
 	{
 		uint32_t nameHash = HashCString(_name);
 		auto it = m_typesByName.find(nameHash);
@@ -1238,6 +1302,24 @@ namespace mirror {
 		return m_types;
 	}
 
+	void TypeSet::resolveTypes()
+	{
+		if (m_resolved)
+		{
+			for (TypeDesc* type : m_types)
+			{
+				type->shutdown();
+			}
+		}
+
+		for (TypeDesc* type : m_types)
+		{
+			type->init();
+		}
+
+		m_resolved = true;
+	}
+
 	TypeSet* g_typeSetPtr = nullptr;
 
 
@@ -1265,6 +1347,96 @@ namespace mirror {
 		return m_virtualTypeWrapper->getSize();
 	}
 
+	const Class* TypeDesc::asClass() const
+	{
+		if (getType() == Type_Class)
+		{
+			return static_cast<const Class*>(this);
+		}
+		return nullptr;
+	}
+
+	const Enum* TypeDesc::asEnum() const
+	{
+		if (getType() == Type_Enum)
+		{
+			return static_cast<const Enum*>(this);
+		}
+		return nullptr;
+	}
+
+	const Pointer* TypeDesc::asPointer() const
+	{
+		if (getType() == Type_Pointer)
+		{
+			return static_cast<const Pointer*>(this);
+		}
+		return nullptr;
+	}
+
+	const StaticFunction* TypeDesc::asStaticFunction() const
+	{
+		if (getType() == Type_StaticFunction)
+		{
+			return static_cast<const StaticFunction*>(this);
+		}
+		return nullptr;
+	}
+
+	const FixedSizeArray* TypeDesc::asFixedSizeArray() const
+	{
+		if (getType() == Type_FixedSizeArray)
+		{
+			return static_cast<const FixedSizeArray*>(this);
+		}
+		return nullptr;
+	}
+
+	Class* TypeDesc::asClass()
+	{
+		if (getType() == Type_Class)
+		{
+			return static_cast<Class*>(this);
+		}
+		return nullptr;
+	}
+
+	Enum* TypeDesc::asEnum()
+	{
+		if (getType() == Type_Enum)
+		{
+			return static_cast<Enum*>(this);
+		}
+		return nullptr;
+	}
+
+	Pointer* TypeDesc::asPointer()
+	{
+		if (getType() == Type_Pointer)
+		{
+			return static_cast<Pointer*>(this);
+		}
+		return nullptr;
+	}
+
+	StaticFunction* TypeDesc::asStaticFunction()
+	{
+		if (getType() == Type_StaticFunction)
+		{
+			return static_cast<StaticFunction*>(this);
+		}
+		return nullptr;
+	}
+
+	FixedSizeArray* TypeDesc::asFixedSizeArray()
+	{
+		if (getType() == Type_FixedSizeArray)
+		{
+			return static_cast<FixedSizeArray*>(this);
+		}
+		return nullptr;
+	}
+
 	TypeDesc::TypeDesc(Type _type, const char* _name, VirtualTypeWrapper* _virtualTypeWrapper)
 		: m_type(_type)
 		, m_virtualTypeWrapper(_virtualTypeWrapper)
@@ -1280,6 +1452,16 @@ namespace mirror {
 	void* TypeDesc::instantiate() const
 	{
 		return m_virtualTypeWrapper->instantiate();
+	}
+
+	void TypeDesc::shutdown()
+	{
+
+	}
+
+	void TypeDesc::init()
+	{
+
 	}
 
 	TypeDesc::~TypeDesc()
@@ -1305,8 +1487,10 @@ namespace mirror {
 
 		if (_includeInheritedMembers)
 		{
-			for (Class* parent : m_parents)
+			for (TypeID parentID : m_parents)
 			{
+				Class* parent = AsClass(parentID);
+				assert(parent != nullptr);
 				parent->getMembers(_outMemberList, true);
 			}
 		}
@@ -1322,8 +1506,10 @@ namespace mirror {
 		}
 		if (_includeInheritedMembers)
 		{
-			for (Class* parent : m_parents)
+			for (TypeID parentID : m_parents)
 			{
+				Class* parent = AsClass(parentID);
+				assert(parent != nullptr);
 				ClassMember* member = parent->findMemberByName(_name);
 				if (member)
 					return member;
@@ -1332,12 +1518,12 @@ namespace mirror {
 		return nullptr;
 	}
 
-	const std::set<Class*>& Class::getParents() const
+	const std::set<TypeID>& Class::getParents() const
 	{
 		return m_parents;
 	}
 
-	const std::set<Class*>& Class::getChildren() const
+	const std::set<TypeID>& Class::getChildren() const
 	{
 		return m_children;
 	}
@@ -1347,8 +1533,10 @@ namespace mirror {
 		if (_class == this)
 			return _checkSelf;
 
-		for (Class* parent : m_parents)
+		for (TypeID parentID : m_parents)
 		{
+			Class* parent = AsClass(parentID);
+			assert(parent != nullptr);
 			return parent->isChildOf(_class, true);
 		}
 		return false;
@@ -1371,19 +1559,32 @@ namespace mirror {
 		uint32_t nameHash = HashCString(_member->getName());
 		assert(m_membersByName.find(nameHash) == m_membersByName.end());
 
-		_member->m_class = this;
+		_member->m_ownerClass = this;
 		m_members.push_back(_member);
 		m_membersByName.insert(std::make_pair(nameHash, _member));
 	}
 
-	void Class::addParent(Class* _parent)
+	void Class::addParent(TypeID _parent)
 	{
-		assert(_parent);
+		assert(_parent != UNDEFINED_TYPEID);
 		assert(std::find(m_parents.begin(), m_parents.end(), _parent) == m_parents.end());
-		assert(std::find(_parent->m_children.begin(), _parent->m_children.end(), this) == _parent->m_children.end());
 
 		m_parents.insert(_parent);
-		_parent->m_children.insert(this);
+	}
+
+	void Class::shutdown()
+	{
+		m_children.clear();
+	}
+
+	void Class::init()
+	{
+		for (TypeID parentID : m_parents)
+		{
+			Class* parent = AsClass(parentID);
+			assert(parent != nullptr);
+			parent->m_children.insert(getTypeID());
+		}
 	}
 
 	Class::Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const char* _metaDataString)
@@ -1412,9 +1613,9 @@ namespace mirror {
 		return m_name;
 	}
 
-	Class* ClassMember::getClass() const
+	Class* ClassMember::getOwnerClass() const
 	{
-		return m_class;
+		return m_ownerClass;
 	}
 
 	size_t ClassMember::getOffset() const
@@ -1458,7 +1659,7 @@ namespace mirror {
 
 	TypeDesc* Enum::getSubType() const
 	{
-		return m_subType;
+		return AsTypeDesc(m_subType);
 	}
 
 	void Enum::addValue(EnumValue* _value)
@@ -1472,9 +1673,9 @@ namespace mirror {
 		m_valuesByNameHash.insert(std::make_pair(hash, _value));
 	}
 
-	Enum::Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeDesc* _subType)
+	Enum::Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeID _subType)
 		: TypeDesc(Type_Enum, _name, _virtualTypeWrapper)
-		, m_subType(_subType ? _subType : TypeDescGetter<int>::Get())
+		, m_subType(_subType)
 	{
 
 	}
@@ -1501,12 +1702,12 @@ namespace mirror {
 	}
 
 	// --- Pointer
-	TypeDesc* PointerTypeDesc::getSubType() const
+	TypeDesc* Pointer::getSubType() const
 	{
 		return GetTypeSet().findTypeByID(m_subType);
 	}
 
-	PointerTypeDesc::PointerTypeDesc(TypeID _subType, VirtualTypeWrapper* _virtualTypeWrapper)
+	Pointer::Pointer(TypeID _subType, VirtualTypeWrapper* _virtualTypeWrapper)
 		: TypeDesc(Type_Pointer, "", _virtualTypeWrapper)
 		, m_subType(_subType)
 	{
@@ -1514,12 +1715,12 @@ namespace mirror {
 	}
 
 	// --- Fixed Size Array
-	TypeDesc* FixedSizeArrayTypeDesc::getSubType() const
+	TypeDesc* FixedSizeArray::getSubType() const
 	{
 		return GetTypeSet().findTypeByID(m_subType);
 	}
 
-	FixedSizeArrayTypeDesc::FixedSizeArrayTypeDesc(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper)
+	FixedSizeArray::FixedSizeArray(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper)
 		: TypeDesc(Type_FixedSizeArray, "fixed_size_array", _virtualTypeWrapper)
 		, m_subType(_subType)
 		, m_elementCount(_elementCount)
