@@ -18,6 +18,7 @@
 #include <vector>
 #include <set>
 #include <unordered_map>
+#include <string>
 #include <type_traits>
 #include <assert.h>
 
@@ -498,6 +499,81 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 namespace mirror {
 
 	//-----------------------------------------------------------------------------
+	// GetTypeID
+	//-----------------------------------------------------------------------------
+	template <typename T>
+	constexpr TypeID GetTypeID()
+	{
+		return typeid(T).hash_code();
+	}
+
+	template <typename T>
+	constexpr TypeID GetTypeID(T&)
+	{
+		return GetTypeID<T>();
+	}
+
+	//-----------------------------------------------------------------------------
+	// Virtual Type Wrapper
+	//-----------------------------------------------------------------------------
+	template <typename T, typename IsShallow = void>
+	class TVirtualTypeWrapperBase : public VirtualTypeWrapper
+	{
+	public:
+		TVirtualTypeWrapperBase()
+		{
+			m_typeID = GetTypeID<T>();
+			m_size = sizeof(T);
+		}
+	};
+
+	template <typename T>
+	class TVirtualTypeWrapperBase<T, std::enable_if_t<std::is_function<T>::value || std::is_void<T>::value>> : public VirtualTypeWrapper
+	{
+	public:
+		TVirtualTypeWrapperBase()
+		{
+			m_typeID = GetTypeID<T>();
+			m_size = 0;
+		}
+	};
+
+	template <>
+	class TVirtualTypeWrapperBase<void> : public VirtualTypeWrapper
+	{
+	public:
+		TVirtualTypeWrapperBase()
+		{
+			m_typeID = GetTypeID<void>();
+			m_size = 0;
+		}
+	};
+
+	template <typename T, bool Factory = false>
+	class TVirtualTypeWrapperFactory : public TVirtualTypeWrapperBase<T>
+	{
+	};
+
+	template <typename T>
+	class TVirtualTypeWrapperFactory<T, true> : public TVirtualTypeWrapperBase<T>
+	{
+	public:
+		virtual bool hasFactory() const override { return true; }
+		virtual void* instantiate() const override { return new T(); }
+	};
+
+	template <typename T, bool Factory = false, bool IsClass = false>
+	class TVirtualTypeWrapper : public TVirtualTypeWrapperFactory<T, Factory>
+	{
+	};
+
+	template <typename T, bool Factory>
+	class TVirtualTypeWrapper<T, Factory, true> : public TVirtualTypeWrapperFactory<T, Factory>
+	{
+		virtual Class* unsafeVirtualGetClass(void* _object) const { return reinterpret_cast<T*>(_object)->getClass(); }
+	};
+
+	//-----------------------------------------------------------------------------
 	// Global Functions
 	//-----------------------------------------------------------------------------
 
@@ -576,18 +652,6 @@ namespace mirror {
 	};
 
 	// Type Desc Accesors
-	template <typename T>
-	constexpr TypeID GetTypeID()
-	{
-		return typeid(T).hash_code();
-	}
-
-	template <typename T>
-	constexpr TypeID GetTypeID(T&)
-	{
-		return GetTypeID<T>();
-	}
-
 	template<typename T>
     Enum* GetEnum()
     {
@@ -711,66 +775,6 @@ namespace mirror {
 		}
 		return false;
 	}
-
-	//-----------------------------------------------------------------------------
-	// Virtual Type Wrapper
-	//-----------------------------------------------------------------------------
-	template <typename T, typename IsShallow = void>
-	class TVirtualTypeWrapperBase : public VirtualTypeWrapper
-	{
-	public:
-		TVirtualTypeWrapperBase()
-		{
-			m_typeID = GetTypeID<T>();
-			m_size = sizeof(T);
-		}
-	};
-
-	template <typename T>
-	class TVirtualTypeWrapperBase<T, std::enable_if_t<std::is_function<T>::value || std::is_void<T>::value>> : public VirtualTypeWrapper
-	{
-	public:
-		TVirtualTypeWrapperBase()
-		{
-			m_typeID = GetTypeID<T>();
-			m_size = 0;
-		}
-	};
-
-	template <>
-	class TVirtualTypeWrapperBase<void> : public VirtualTypeWrapper
-	{
-	public:
-		TVirtualTypeWrapperBase()
-		{
-			m_typeID = GetTypeID<void>();
-			m_size = 0;
-		}
-	};
-
-	template <typename T, bool Factory = false>
-	class TVirtualTypeWrapperFactory : public TVirtualTypeWrapperBase<T>
-	{
-	};
-
-	template <typename T>
-	class TVirtualTypeWrapperFactory<T, true> : public TVirtualTypeWrapperBase<T>
-	{
-	public:
-		virtual bool hasFactory() const override { return true; }
-		virtual void* instantiate() const override { return new T(); }
-	};
-
-	template <typename T, bool Factory = false, bool IsClass = false>
-	class TVirtualTypeWrapper : public TVirtualTypeWrapperFactory<T, Factory>
-	{
-	};
-
-	template <typename T, bool Factory>
-	class TVirtualTypeWrapper<T, Factory, true> : public TVirtualTypeWrapperFactory<T, Factory>
-	{
-		virtual Class* unsafeVirtualGetClass(void* _object) const { return reinterpret_cast<T*>(_object)->getClass(); }
-	};
 
 	//-----------------------------------------------------------------------------
 	// Types Initialization
@@ -959,7 +963,7 @@ namespace mirror {
 			{
 				using function_pointer_t = typename std::add_pointer<T>::type;
 
-				StaticFunction* StaticFunction = new StaticFunction(new TVirtualTypeWrapper<T, false>());
+				StaticFunction* StaticFunction = new class StaticFunction(new TVirtualTypeWrapper<T, false>());
 				GetTypeSet().addType(StaticFunction);
 
 				// Return type
@@ -1711,7 +1715,7 @@ namespace mirror {
 		: TypeDesc(Type_Pointer, "", _virtualTypeWrapper)
 		, m_subType(_subType)
 	{
-		setName((std::string("pointer_") + GetTypeSet().findTypeByID(_subType)->getName()).c_str());
+		setName((std::string("pointer_") + std::string(GetTypeSet().findTypeByID(_subType)->getName())).c_str());
 	}
 
 	// --- Fixed Size Array
