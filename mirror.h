@@ -168,6 +168,7 @@ namespace mirror {
 	//private:
 		std::set<TypeDesc*> m_types;
 		std::unordered_map<TypeID, TypeDesc*> m_typesByID;
+		std::unordered_map<TypeID, int> m_typesRegistrationCount;
 		std::unordered_map<uint32_t, TypeDesc*> m_typesByName;
 
 		bool m_resolved = false;
@@ -1264,6 +1265,15 @@ namespace mirror {
 	void TypeSet::addType(TypeDesc* _type)
 	{
 		assert(_type);
+
+		// Using dlls can result in multiple registration the same type. We accept the first type and screen all others
+		auto result = m_typesRegistrationCount.insert(std::make_pair(_type->getTypeID(), 0));
+		++result.first->second;
+		if (result.first->second > 1)
+		{
+			return;
+		}
+
 		uint32_t nameHash = HashCString(_type->getName());
 
 		// Checks if a type with the same typeID or namehash does not already exists
@@ -1280,6 +1290,15 @@ namespace mirror {
 	{
 		assert(_type);
 
+		// Using dlls can result in multiple registration the same type. We accept the first type and screen all others
+		auto registrationCountIt = m_typesRegistrationCount.find(_type->getTypeID());		
+		assert(registrationCountIt != m_typesRegistrationCount.end());
+		--registrationCountIt->second;
+		if (registrationCountIt->second > 0)
+		{
+			return;
+		}
+
 		// Checks if a type with the same typeID or namehash already exists
 		{
 			auto it = m_typesByID.find(_type->getTypeID());
@@ -1295,7 +1314,10 @@ namespace mirror {
 		}
 		
 		{
-			auto it = m_types.find(_type);
+			// because of the dll multiple loading thing, last removed type won't necessary be the same pointer, that's why we compare ids (although, if the dll has been unloaded, the call to getType will probably crash)
+			auto it = std::find_if(m_types.begin(), m_types.end(),
+				[_type](TypeDesc* _t) { return _t->getTypeID() == _type->getTypeID(); }
+			);
 			assert(it != m_types.end());
 			m_types.erase(it);
 		}
