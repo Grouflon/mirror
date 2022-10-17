@@ -245,6 +245,8 @@ namespace mirror {
 	class MIRROR_API Class : public TypeDesc
 	{
 	public:
+		size_t getMembersCount(bool _includeInheritedMembers = true) const;
+		size_t getMembers(ClassMember** _outMemberList, size_t _memberListSize, bool _includeInheritedMembers = true) const;
 		void getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers = true) const;
 		ClassMember* findMemberByName(const char* _name, bool _includeInheritedMembers = true) const;
 
@@ -1507,6 +1509,47 @@ namespace mirror {
 	//-----------------------------------------------------------------------------
 
 	// --- Class
+	size_t Class::getMembersCount(bool _includeInheritedMembers) const
+	{
+		size_t count = m_members.size();
+		if (_includeInheritedMembers)
+		{
+			for (TypeID parentID : m_parents)
+			{
+				Class* parent = AsClass(parentID);
+				assert(parent != nullptr);
+				count += parent->getMembersCount(true);
+			}
+		}
+		return count;
+	}
+
+	size_t Class::getMembers(ClassMember** _outMemberList, size_t _memberListSize, bool _includeInheritedMembers) const
+	{
+		size_t writtenCount = 0;
+
+		for (ClassMember* member : m_members)
+		{
+			if (writtenCount >= _memberListSize)
+				break;
+
+			_outMemberList[writtenCount] = member;
+			++writtenCount;
+		}
+
+		if (_includeInheritedMembers)
+		{
+			for (TypeID parentID : m_parents)
+			{
+				Class* parent = AsClass(parentID);
+				assert(parent != nullptr);
+				writtenCount += parent->getMembers(_outMemberList + writtenCount, _memberListSize - writtenCount, true);
+			}
+		}
+
+		return writtenCount;
+	}
+
 	void Class::getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers) const
 	{
 		_outMemberList.insert(_outMemberList.end(), m_members.begin(), m_members.end());
