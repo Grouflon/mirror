@@ -86,6 +86,7 @@ namespace mirror {
 	//-----------------------------------------------------------------------------
 	MIRROR_API uint32_t Hash32(const void* _data, size_t _size);
 	MIRROR_API uint32_t HashCString(const char* _str);
+	MIRROR_API const char* TypeToString(Type _type);
 
 	//-----------------------------------------------------------------------------
 	// Global Functions
@@ -105,6 +106,7 @@ namespace mirror {
 	template <typename DestType, typename SourceType> DestType Cast(SourceType _o);
 
 	MIRROR_API TypeDesc* FindTypeByName(const char* _name);
+	MIRROR_API TypeDesc* FindTypeByID(TypeID _id);
 
 	MIRROR_API TypeDesc* AsTypeDesc(TypeID _id);
 	MIRROR_API Class* AsClass(TypeID _id);
@@ -1035,12 +1037,46 @@ namespace mirror {
 		return Hash32(_str, strlen(_str));
 	}
 
+	const char* TypeToString(Type _type)
+	{
+		switch(_type)
+		{
+			case Type_none: return "none";
+			case Type_void: return "void";
+			case Type_bool: return "bool";
+			case Type_char: return "char";
+			case Type_int8: return "int8";
+			case Type_int16: return "int16";
+			case Type_int32: return "int32";
+			case Type_int64: return "int64";
+			case Type_uint8: return "uint8";
+			case Type_uint16: return "uint16";
+			case Type_uint32: return "uint32";
+			case Type_uint64: return "uint64";
+			case Type_float: return "float";
+			case Type_double: return "double";
+			case Type_Enum: return "Enum";
+			case Type_Class: return "Class";
+			case Type_Pointer: return "Pointer";
+			case Type_FixedSizeArray: return "FixedSizeArray";
+			case Type_StaticFunction: return "StaticFunction";
+			case Type_COUNT: return "COUNT";
+			default: assert(false);
+		}
+		return "";
+	}
+
 	//-----------------------------------------------------------------------------
 	// Global Functions
 	//-----------------------------------------------------------------------------
 	TypeDesc* FindTypeByName(const char* _name)
 	{
 		return GetTypeSet().findTypeByName(_name);
+	}
+
+	TypeDesc* FindTypeByID(TypeID _id)
+	{
+		return GetTypeSet().findTypeByID(_id);
 	}
 
 	TypeDesc* AsTypeDesc(TypeID _id)
