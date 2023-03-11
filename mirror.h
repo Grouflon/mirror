@@ -594,13 +594,29 @@ namespace mirror {
 	};
 
 	template <typename T>
+    struct FixedSizeArrayInitializer
+    {
+        FixedSizeArrayInitializer()
+        {
+			using type = typename std::remove_extent<T>::type;
+			typeDesc = new FixedSizeArray(TypeDescGetter<type>::Get()->getTypeID(), std::extent<T>::value , new TVirtualTypeWrapper<T>());
+			GetTypeSet().addType(typeDesc);
+        }
+        ~FixedSizeArrayInitializer()
+        {
+            GetTypeSet().removeType(typeDesc);
+            delete typeDesc;
+        }
+        FixedSizeArray* typeDesc = nullptr;
+    };
+
+	template <typename T>
 	struct TypeDescGetter<T, std::enable_if_t<std::is_array<T>::value>>
 	{
 		static TypeDesc* Get()
 		{
-			using type = typename std::remove_extent<T>::type;
-			static FixedSizeArray s_FixedSizeArray(TypeDescGetter<type>::Get(), std::extent<T>::value , new TVirtualTypeWrapper<T>());
-			return &s_FixedSizeArray;
+			static FixedSizeArrayInitializer<T> s_FixedSizeArrayInitializer;
+			return GetTypeSet().findTypeByID(GetTypeID<T>());
 		}
 	};
 
@@ -627,15 +643,6 @@ namespace mirror {
 		static TypeDesc* Get()
 		{
 			static PointerInitializer<T> s_PointerInitializer;
-			/*TypeDesc* typeDesc = GetTypeSet().findTypeByID(GetTypeID<T>());
-			if (!typeDesc)
-			{
-				using type = typename std::remove_pointer<T>::type;
-				Pointer* Pointer = new Pointer(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
-				GetTypeSet().addType(Pointer);
-				typeDesc = Pointer;
-			}*/
-			//return s_PointerInitializer->typeDesc;
 			return GetTypeSet().findTypeByID(GetTypeID<T>());
 		}
 	};
@@ -1826,11 +1833,17 @@ namespace mirror {
 	}
 
 	FixedSizeArray::FixedSizeArray(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper)
-		: TypeDesc(Type_FixedSizeArray, "fixed_size_array", _virtualTypeWrapper)
+		: TypeDesc(Type_FixedSizeArray, "", _virtualTypeWrapper)
 		, m_subType(_subType)
 		, m_elementCount(_elementCount)
 	{
-
+		const char* format = "array%d_%s";
+		TypeDesc* subType = GetTypeSet().findTypeByID(_subType);
+		size_t nameSize = snprintf(nullptr, 0, format, _elementCount, subType->getName());
+		std::string name;
+		name.resize(nameSize);
+		snprintf(const_cast<char*>(name.data()), nameSize + 1, format, _elementCount, subType->getName());
+		setName(name.c_str());
 	}
 
 	//-----------------------------------------------------------------------------
