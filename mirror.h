@@ -716,21 +716,21 @@ namespace mirror {
 		static_assert(std::is_pointer<DestType>::value, "Mismatching pointer count between cast source and cast destination (DestType is not a pointer).");
 		static_assert(std::is_pointer<SourceType>::value, "Mismatching pointer count between cast source and cast destination (SourceType is not a pointer).");
 
-		static bool Unpile(Class** _destClass, Class** _sourceClass)
+		static bool Unpile(SourceType& _o, Class** _destClass, Class** _sourceClass)
 		{
 			using source_t = typename std::remove_pointer<SourceType>::type;
 			using dest_t   = typename std::remove_pointer<DestType>::type;
-			return CastClassesUnpiler<dest_t, source_t>::Unpile(_destClass, _sourceClass);
+			return CastClassesUnpiler<dest_t, source_t>::Unpile(*_o, _destClass, _sourceClass);
 		}
 	};
 
 	template <typename DestType, typename SourceType>
 	struct CastClassesUnpiler<DestType, SourceType, std::enable_if_t<!std::is_pointer<DestType>::value>, std::enable_if_t<!std::is_pointer<SourceType>::value>>
 	{
-		static bool Unpile(Class** _destClass, Class** _sourceClass)
+		static bool Unpile(SourceType& _o, Class** _destClass, Class** _sourceClass)
 		{
 			*_destClass = DestType::GetClass();
-			*_sourceClass = SourceType::GetClass();
+			*_sourceClass = _o.getClass();
 
 			return true;
 		}
@@ -741,7 +741,7 @@ namespace mirror {
 	{
 		Class* destClass = nullptr;
 		Class* sourceClass = nullptr;
-		if (CastClassesUnpiler<DestType, SourceType>::Unpile(&destClass, &sourceClass))
+		if (CastClassesUnpiler<DestType, SourceType>::Unpile(_o, &destClass, &sourceClass))
 		{
 			if (destClass != nullptr && sourceClass != nullptr)
 			{
