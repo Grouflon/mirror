@@ -84,6 +84,9 @@ namespace mirror {
 	//-----------------------------------------------------------------------------
 	// Helpers & Tools
 	//-----------------------------------------------------------------------------
+	#define _MIRROR_CAT(a, b) a##b
+	#define MIRROR_CAT(a, b) _MIRROR_CAT(a, b)
+
 	MIRROR_API uint32_t Hash32(const void* _data, size_t _size);
 	MIRROR_API uint32_t HashCString(const char* _str);
 	MIRROR_API const char* TypeToString(Type _type);
@@ -493,6 +496,39 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 
 #define _MIRROR_ENUM_VALUE_CONTENT(...)
 
+
+#define MIRROR_EXTERN_CLASS(_class, ...)\
+	namespace MIRROR_CAT(__Mirror, _class) {\
+	extern struct Initializer\
+	{\
+		mirror::Class* clss = nullptr;\
+		~Initializer()\
+		{\
+			mirror::GetTypeSet().removeType(clss);\
+			delete clss;\
+		}\
+		Initializer()\
+		{\
+			const char* metaDataString = #__VA_ARGS__"";\
+			mirror::MetaDataSet metaDataSet(metaDataString);\
+			mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<_class, false, false>();\
+			clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
+			char fakePrototype[sizeof(_class)] = {};\
+			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
+			(void)prototypePtr;\
+			__MIRROR_EXTERN_CLASS_CONTENT
+
+#define __MIRROR_EXTERN_CLASS_CONTENT(...)\
+			__VA_ARGS__\
+			mirror::GetTypeSet().addType(clss);\
+		}\
+	} initializer;\
+	} // namespace __Mirror##_class
+
+#define MIRROR_EXTERN_CLASS_DEFINITION(_class)\
+	namespace MIRROR_CAT(__Mirror, _class) {\
+		Initializer initializer;\
+	} // namespace __Mirror##_class
 
 
 //*****************************************************************************
