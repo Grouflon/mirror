@@ -1177,17 +1177,17 @@ namespace mirror {
 
 	bool MetaData::asBool() const
 	{
-		return false;
+		return strcmp("true", m_data) == 0;
 	}
 
 	int MetaData::asInt() const
 	{
-		return 0;
+		return atoi(m_data);
 	}
 
 	float MetaData::asFloat() const
 	{
-		return 0.f;
+		return atof(m_data);
 	}
 
 	const char* MetaData::asString() const
@@ -1241,7 +1241,7 @@ namespace mirror {
 					if (!hasFirstChar)
 					{
 						firstChar = cur;
-						lastChar = cur;
+						lastChar = cur + 1;
 						hasFirstChar = true;
 					}
 					else
