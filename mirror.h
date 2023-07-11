@@ -45,6 +45,8 @@ namespace mirror {
 	struct MetaData;
 	struct MetaDataSet;
 
+	typedef void* (*AllocateFunction)(size_t _size, void* _userData);
+
 	const TypeID UNDEFINED_TYPEID = 0;
 
 	//-----------------------------------------------------------------------------
@@ -109,6 +111,7 @@ namespace mirror {
 	template <typename DestType, typename SourceType> DestType Cast(SourceType _o);
 
 	MIRROR_API TypeDesc* FindTypeByName(const char* _name);
+	MIRROR_API Class* FindClassByName(const char* _name);
 	MIRROR_API TypeDesc* FindTypeByID(TypeID _id);
 
 	MIRROR_API TypeDesc* AsTypeDesc(TypeID _id);
@@ -207,7 +210,7 @@ namespace mirror {
 
 		// @TODO(2021/02/15|Remi): Allow the user to choose their allocator
 		bool hasFactory() const;
-		void* instantiate() const;
+		void* instantiate(AllocateFunction _allocateFunction = nullptr, void* _userData = nullptr) const;
 
 	// internal
 		void setName(const char* _name);
@@ -233,7 +236,7 @@ namespace mirror {
 		size_t getSize() const { return m_size; }
 
 		virtual bool hasFactory() const { return false; }
-		virtual void* instantiate() const { return nullptr; }
+		virtual void* instantiate(AllocateFunction _allocateFunction = nullptr, void* _userData = nullptr) const { return nullptr; }
 
 		virtual Class* unsafeVirtualGetClass(void* _object) const { return nullptr; }
 
@@ -411,14 +414,14 @@ public:\
 #define __MIRROR_CLASS_CONSTRUCTION(_class, ...)\
 	static ::mirror::Class* GetClass() { return ::mirror::GetClass<_class>(); }\
 	\
-	static ::mirror::ClassInitializer<_class, false> __MirrorInitializer;\
+	static ::mirror::ClassInitializer<_class> __MirrorInitializer;\
 	static ::mirror::Class* __MirrorCreateClass()\
 	{\
 		using classType = _class;\
 		\
 		const char* metaDataString = #__VA_ARGS__"";\
 		mirror::MetaDataSet metaDataSet(metaDataString);\
-		mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType, false, true>();\
+		mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType>();\
 		::mirror::Class* clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
 		char fakePrototype[sizeof(_class)] = {};\
 		_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
@@ -452,7 +455,7 @@ public:\
 	}
 
 #define MIRROR_CLASS_DEFINITION(_class)\
-	::mirror::ClassInitializer<_class, false> _class::__MirrorInitializer;
+	::mirror::ClassInitializer<_class> _class::__MirrorInitializer;
 
 
 #define MIRROR_ENUM(_enumName)\
@@ -533,7 +536,7 @@ public:\
 		{\
 			const char* metaDataString = #__VA_ARGS__"";\
 			::mirror::MetaDataSet metaDataSet(metaDataString);\
-			::mirror::VirtualTypeWrapper* virtualTypeWrapper = new ::mirror::TVirtualTypeWrapper<_class, false, false>();\
+			::mirror::VirtualTypeWrapper* virtualTypeWrapper = new ::mirror::TVirtualTypeWrapper<_class>();\
 			clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
@@ -580,60 +583,43 @@ namespace mirror {
 	// Virtual Type Wrapper
 	//-----------------------------------------------------------------------------
 	template <typename T, typename IsShallow = void>
-	class TVirtualTypeWrapperBase : public VirtualTypeWrapper
+	class TVirtualTypeWrapper : public VirtualTypeWrapper
 	{
 	public:
-		TVirtualTypeWrapperBase()
+		TVirtualTypeWrapper()
 		{
 			m_typeID = GetTypeID<T>();
 			m_size = sizeof(T);
 		}
+
+		virtual bool hasFactory() const override { return true; }
+		virtual void* instantiate(AllocateFunction _allocateFunction = nullptr, void* _userData = nullptr) const override
+		{
+			if (_allocateFunction == nullptr)
+			{
+				return new T();
+			}
+			else
+			{
+				T* memory = (T*)_allocateFunction(sizeof(T), _userData);
+				new (memory) T();
+				return memory;
+			}
+		}
 	};
 
 	template <typename T>
-	class TVirtualTypeWrapperBase<T, std::enable_if_t<std::is_function<T>::value || std::is_void<T>::value>> : public VirtualTypeWrapper
+	class TVirtualTypeWrapper<T, std::enable_if_t<std::is_function<T>::value || std::is_void<T>::value>> : public VirtualTypeWrapper
 	{
 	public:
-		TVirtualTypeWrapperBase()
+		TVirtualTypeWrapper()
 		{
 			m_typeID = GetTypeID<T>();
 			m_size = 0;
 		}
-	};
 
-	template <>
-	class TVirtualTypeWrapperBase<void> : public VirtualTypeWrapper
-	{
-	public:
-		TVirtualTypeWrapperBase()
-		{
-			m_typeID = GetTypeID<void>();
-			m_size = 0;
-		}
-	};
-
-	template <typename T, bool Factory = false>
-	class TVirtualTypeWrapperFactory : public TVirtualTypeWrapperBase<T>
-	{
-	};
-
-	template <typename T>
-	class TVirtualTypeWrapperFactory<T, true> : public TVirtualTypeWrapperBase<T>
-	{
-	public:
-		virtual bool hasFactory() const override { return true; }
-		virtual void* instantiate() const override { return new T(); }
-	};
-
-	template <typename T, bool Factory = false, bool IsClass = false>
-	class TVirtualTypeWrapper : public TVirtualTypeWrapperFactory<T, Factory>
-	{
-	};
-
-	template <typename T, bool Factory>
-	class TVirtualTypeWrapper<T, Factory, true> : public TVirtualTypeWrapperFactory<T, Factory>
-	{
-		virtual Class* unsafeVirtualGetClass(void* _object) const { return reinterpret_cast<T*>(_object)->getClass(); }
+		virtual bool hasFactory() const override { return false; }
+		virtual void* instantiate(AllocateFunction _allocateFunction = nullptr, void* _userData = nullptr) const override { return nullptr; }
 	};
 
 	//-----------------------------------------------------------------------------
@@ -855,12 +841,12 @@ namespace mirror {
 	// Types Initialization
 	//-----------------------------------------------------------------------------
 
-	template <typename T, bool HasFactory = true>
+	template <typename T>
 	struct TypeDescInitializer
 	{
 		TypeDescInitializer(Type _type, const char* _name)
 		{
-			typeDesc = new TypeDesc(_type, _name, new TVirtualTypeWrapper<T, HasFactory>());
+			typeDesc = new TypeDesc(_type, _name, new TVirtualTypeWrapper<T>());
 			GetTypeSet().addType(typeDesc);
 		}
 		~TypeDescInitializer()
@@ -871,7 +857,7 @@ namespace mirror {
 		TypeDesc* typeDesc = nullptr;
 	};
 
-	template <typename T, bool HasFactory = true>
+	template <typename T>
 	struct ClassInitializer
 	{
 		ClassInitializer()
@@ -887,21 +873,21 @@ namespace mirror {
 		Class* clss = nullptr;
 	};
 
-	#define TYPEDESCINITIALIZER_DECLARE(_type, _hasFactory) extern TypeDescInitializer<_type, _hasFactory> g_##_type##TypeInitializer
+	#define TYPEDESCINITIALIZER_DECLARE(_type) extern TypeDescInitializer<_type> g_##_type##TypeInitializer
 
-	TYPEDESCINITIALIZER_DECLARE(void, false);
-	TYPEDESCINITIALIZER_DECLARE(bool, true);
-	TYPEDESCINITIALIZER_DECLARE(char, true);
-	TYPEDESCINITIALIZER_DECLARE(int8_t, true);
-	TYPEDESCINITIALIZER_DECLARE(int16_t, true);
-	TYPEDESCINITIALIZER_DECLARE(int32_t, true);
-	TYPEDESCINITIALIZER_DECLARE(int64_t, true);
-	TYPEDESCINITIALIZER_DECLARE(uint8_t, true);
-	TYPEDESCINITIALIZER_DECLARE(uint16_t, true);
-	TYPEDESCINITIALIZER_DECLARE(uint32_t, true);
-	TYPEDESCINITIALIZER_DECLARE(uint64_t, true);
-	TYPEDESCINITIALIZER_DECLARE(float, true);
-	TYPEDESCINITIALIZER_DECLARE(double, true);
+	TYPEDESCINITIALIZER_DECLARE(void);
+	TYPEDESCINITIALIZER_DECLARE(bool);
+	TYPEDESCINITIALIZER_DECLARE(char);
+	TYPEDESCINITIALIZER_DECLARE(int8_t);
+	TYPEDESCINITIALIZER_DECLARE(int16_t);
+	TYPEDESCINITIALIZER_DECLARE(int32_t);
+	TYPEDESCINITIALIZER_DECLARE(int64_t);
+	TYPEDESCINITIALIZER_DECLARE(uint8_t);
+	TYPEDESCINITIALIZER_DECLARE(uint16_t);
+	TYPEDESCINITIALIZER_DECLARE(uint32_t);
+	TYPEDESCINITIALIZER_DECLARE(uint64_t);
+	TYPEDESCINITIALIZER_DECLARE(float);
+	TYPEDESCINITIALIZER_DECLARE(double);
 
 	#undef TYPEDESCINITIALIZER_DECLARE
 
@@ -1142,6 +1128,12 @@ namespace mirror {
 	TypeDesc* FindTypeByName(const char* _name)
 	{
 		return GetTypeSet().findTypeByName(_name);
+	}
+
+	Class* FindClassByName(const char* _name)
+	{
+		TypeDesc* type = FindTypeByName(_name);
+		return type != nullptr ? type->asClass() : nullptr;
 	}
 
 	TypeDesc* FindTypeByID(TypeID _id)
@@ -1583,9 +1575,9 @@ namespace mirror {
 		return m_virtualTypeWrapper->hasFactory();
 	}
 
-	void* TypeDesc::instantiate() const
+	void* TypeDesc::instantiate(AllocateFunction _allocateFunction, void* _userData) const
 	{
-		return m_virtualTypeWrapper->instantiate();
+		return m_virtualTypeWrapper->instantiate(_allocateFunction, _userData);
 	}
 
 	void TypeDesc::shutdown()
@@ -1913,21 +1905,21 @@ namespace mirror {
 	// Types Implementation
 	//-----------------------------------------------------------------------------
 
-	#define __MIRROR_TYPEDESCINITIALIZER_DEFINE(_type, _hasFactory, _mirrorType) ::mirror::TypeDescInitializer<_type, _hasFactory> g_##_type##TypeInitializer(_mirrorType, #_type)
+	#define __MIRROR_TYPEDESCINITIALIZER_DEFINE(_type, _mirrorType) ::mirror::TypeDescInitializer<_type> g_##_type##TypeInitializer(_mirrorType, #_type)
 
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(void, false, Type_void);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(bool, true, Type_bool);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(char, true, Type_char);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(int8_t, true, Type_int8);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(int16_t, true, Type_int16);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(int32_t, true, Type_int32);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(int64_t, true, Type_int64);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint8_t, true, Type_uint8);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint16_t, true, Type_uint16);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint32_t, true, Type_uint32);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint64_t, true, Type_uint64);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(float, true, Type_float);
-	__MIRROR_TYPEDESCINITIALIZER_DEFINE(double, true, Type_double);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(void, Type_void);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(bool, Type_bool);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(char, Type_char);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(int8_t, Type_int8);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(int16_t, Type_int16);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(int32_t, Type_int32);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(int64_t, Type_int64);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint8_t, Type_uint8);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint16_t, Type_uint16);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint32_t, Type_uint32);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(uint64_t, Type_uint64);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(float, Type_float);
+	__MIRROR_TYPEDESCINITIALIZER_DEFINE(double, Type_double);
 
 	#undef __MIRROR_TYPEDESCINITIALIZER_DEFINE
 
