@@ -454,47 +454,69 @@ public:\
 #define MIRROR_CLASS_DEFINITION(_class)\
 	::mirror::ClassInitializer<_class, false> _class::__MirrorInitializer;
 
-#define MIRROR_ENUM(_enumName)\
-template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDesc* Get() { \
-	using enumType = _enumName; \
-	static ::mirror::Enum* s_enum = nullptr; \
-	if (s_enum == nullptr) \
-	{ \
-		s_enum = new ::mirror::Enum(#_enumName, new TVirtualTypeWrapper<enumType>()); \
-		__MIRROR_ENUM_CONTENT
 
-#define MIRROR_ENUM_VALUE(_enumValue)\
-		s_enum->addValue(new ::mirror::EnumValue(#_enumValue, _enumValue));\
-		_MIRROR_ENUM_VALUE_CONTENT
+#define MIRROR_ENUM(_enumName)\
+	namespace MIRROR_CAT(__Mirror, _enumName) {\
+	extern struct Initializer\
+	{\
+		mirror::Enum* enm = nullptr;\
+		~Initializer()\
+		{\
+			::mirror::GetTypeSet().removeType(enm);\
+			delete enm;\
+		}\
+		Initializer()\
+		{\
+			enm = new ::mirror::Enum(#_enumName, new ::mirror::TVirtualTypeWrapper<enumType>()); \
+			__MIRROR_ENUM_CONTENT
 
 #define MIRROR_ENUM_CLASS(_enumName)\
-template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDesc* Get() { \
-	using enumType = _enumName; \
-	static ::mirror::Enum* s_enum = nullptr; \
-	if (s_enum == nullptr) \
-	{ \
-		TypeDesc* subType; \
-		switch(sizeof(enumType)) { \
-			case 1: subType = ::mirror::TypeDescGetter<int8_t>::Get(); break; \
-			case 2: subType = ::mirror::TypeDescGetter<int16_t>::Get(); break; \
-			case 4: subType = ::mirror::TypeDescGetter<int32_t>::Get(); break; \
-			case 8: subType = ::mirror::TypeDescGetter<int64_t>::Get(); break; \
-		} \
-		s_enum = new ::mirror::Enum(#_enumName, new TVirtualTypeWrapper<enumType>(), subType->getTypeID()); \
-		__MIRROR_ENUM_CONTENT
-
-#define MIRROR_ENUM_CLASS_VALUE(_enumValue)\
-		s_enum->addValue(new ::mirror::EnumValue(#_enumValue, int64_t(enumType::_enumValue)));\
-		_MIRROR_ENUM_VALUE_CONTENT
+	namespace MIRROR_CAT(__Mirror, _enumName) {\
+	extern struct Initializer\
+	{\
+		mirror::Enum* enm = nullptr;\
+		~Initializer()\
+		{\
+			::mirror::GetTypeSet().removeType(enm);\
+			delete enm;\
+		}\
+		Initializer()\
+		{\
+			using enumType = _enumName; \
+			::mirror::TypeDesc* subType; \
+			switch(sizeof(enumType)) { \
+				case 1: subType = ::mirror::TypeDescGetter<int8_t>::Get(); break; \
+				case 2: subType = ::mirror::TypeDescGetter<int16_t>::Get(); break; \
+				case 4: subType = ::mirror::TypeDescGetter<int32_t>::Get(); break; \
+				case 8: subType = ::mirror::TypeDescGetter<int64_t>::Get(); break; \
+			} \
+			enm = new ::mirror::Enum(#_enumName, new ::mirror::TVirtualTypeWrapper<enumType>(), subType->getTypeID()); \
+			__MIRROR_ENUM_CONTENT
 
 #define __MIRROR_ENUM_CONTENT(...)\
-		__VA_ARGS__\
-		::mirror::GetTypeSet()->addType(s_enum);\
-	}\
-	return s_enum;\
-}};
+			__VA_ARGS__\
+			mirror::GetTypeSet().addType(enm);\
+		}\
+	} initializer;\
+	} // namespace __Mirror##_enumName
+
+#define MIRROR_ENUM_VALUE(_enumValue)\
+		enm->addValue(new ::mirror::EnumValue(#_enumValue, _enumValue));\
+		_MIRROR_ENUM_VALUE_CONTENT
+
+#define MIRROR_ENUM_CLASS_VALUE(_enumValue)\
+		enm->addValue(new ::mirror::EnumValue(#_enumValue, int64_t(enumType::_enumValue)));\
+		_MIRROR_ENUM_VALUE_CONTENT
 
 #define _MIRROR_ENUM_VALUE_CONTENT(...)
+
+#define MIRROR_ENUM_DEFINITION(_enumName)\
+	namespace MIRROR_CAT(__Mirror, _enumName) {\
+		Initializer initializer;\
+	} // namespace __Mirror##_enumName
+
+#define MIRROR_ENUM_CLASS_DEFINITION(_enumName)\
+	MIRROR_ENUM_DEFINITION(_enumName)
 
 
 #define MIRROR_EXTERN_CLASS(_class, ...)\
@@ -504,14 +526,14 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 		mirror::Class* clss = nullptr;\
 		~Initializer()\
 		{\
-			mirror::GetTypeSet().removeType(clss);\
+			::mirror::GetTypeSet().removeType(clss);\
 			delete clss;\
 		}\
 		Initializer()\
 		{\
 			const char* metaDataString = #__VA_ARGS__"";\
-			mirror::MetaDataSet metaDataSet(metaDataString);\
-			mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<_class, false, false>();\
+			::mirror::MetaDataSet metaDataSet(metaDataString);\
+			::mirror::VirtualTypeWrapper* virtualTypeWrapper = new ::mirror::TVirtualTypeWrapper<_class, false, false>();\
 			clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
@@ -520,7 +542,7 @@ template <> struct ::mirror::TypeDescGetter<_enumName> {	static ::mirror::TypeDe
 
 #define __MIRROR_EXTERN_CLASS_CONTENT(...)\
 			__VA_ARGS__\
-			mirror::GetTypeSet().addType(clss);\
+			::mirror::GetTypeSet().addType(clss);\
 		}\
 	} initializer;\
 	} // namespace __Mirror##_class
@@ -688,6 +710,11 @@ namespace mirror {
 	{
 		static TypeDesc* Get()
 		{
+			TypeID typeID = GetTypeID<T>();
+			TypeDesc* type = GetTypeSet().findTypeByID(typeID);
+			if (type != nullptr)
+				return type;
+
 			switch (sizeof(T))
 			{
 			case 1: return TypeDescGetter<int8_t>::Get();
