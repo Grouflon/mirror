@@ -258,6 +258,7 @@ namespace mirror {
 		void getMembers(std::vector<ClassMember*>& _outMemberList, bool _includeInheritedMembers = true) const;
 		ClassMember* findMemberByName(const char* _name, bool _includeInheritedMembers = true) const;
 
+		TypeID getParent() const;
 		const std::set<TypeID>& getParents() const;
 		const std::set<TypeID>& getChildren() const;
 
@@ -1149,31 +1150,31 @@ namespace mirror {
 	Class* AsClass(TypeID _id)
 	{
 		TypeDesc* type = AsTypeDesc(_id);
-		return type->asClass();
+		return type != nullptr ? type->asClass() : nullptr;
 	}
 
 	Enum* AsEnum(TypeID _id)
 	{
 		TypeDesc* type = AsTypeDesc(_id);
-		return type->asEnum();
+		return type != nullptr ? type->asEnum() : nullptr;
 	}
 
 	Pointer* AsPointer(TypeID _id)
 	{
 		TypeDesc* type = AsTypeDesc(_id);
-		return type->asPointer();
+		return type != nullptr ? type->asPointer() : nullptr;
 	}
 
 	StaticFunction* AsStaticFunction(TypeID _id)
 	{
 		TypeDesc* type = AsTypeDesc(_id);
-		return type->asStaticFunction();
+		return type != nullptr ? type->asStaticFunction() : nullptr;
 	}
 
 	FixedSizeArray* AsFixedSizeArray(TypeID _id)
 	{
 		TypeDesc* type = AsTypeDesc(_id);
-		return type->asFixedSizeArray();
+		return type != nullptr ? type->asFixedSizeArray() : nullptr;
 	}
 
 	TypeSet& GetTypeSet()
@@ -1683,6 +1684,11 @@ namespace mirror {
 			}
 		}
 		return nullptr;
+	}
+
+	TypeID Class::getParent() const
+	{
+		return m_parents.size() > 0 ? *m_parents.begin() : UNDEFINED_TYPEID;
 	}
 
 	const std::set<TypeID>& Class::getParents() const
