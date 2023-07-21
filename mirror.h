@@ -1321,6 +1321,7 @@ namespace mirror {
 				m_metaData.insert(std::make_pair(HashCString(metaData.getName()), metaData));
 
 				key = cur + 1;
+				value = nullptr;
 			}
 			else if (value == nullptr && *cur == '=')
 			{
