@@ -167,6 +167,7 @@ namespace mirror {
 		TypeDesc* findTypeByName(const char* _name) const;
 
 		void addType(TypeDesc* _type);
+		void addTypeName(TypeDesc* _type, const char* _name);
 		void removeType(TypeDesc* _type);
 
 		const std::set<TypeDesc*>& getTypes() const;
@@ -1386,6 +1387,16 @@ namespace mirror {
 		m_typesByID.insert(std::make_pair(_type->getTypeID(), _type));
 		m_typesByName.insert(std::make_pair(nameHash, _type));
 		m_types.emplace(_type);
+	}
+
+	void TypeSet::addTypeName(TypeDesc* _type, const char* _name)
+	{
+		assert(_type);
+		assert(_name);
+
+		uint32_t nameHash = HashCString(_name);
+		assert(m_typesByName.find(nameHash) == m_typesByName.end());
+		m_typesByName.insert(std::make_pair(nameHash, _type));
 	}
 
 	void TypeSet::removeType(TypeDesc* _type)
