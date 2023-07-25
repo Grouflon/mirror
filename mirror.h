@@ -80,6 +80,8 @@ namespace mirror {
 
 		Type_StaticFunction,
 
+		Type_Custom,
+
 		Type_COUNT,
 	};
 
@@ -194,6 +196,7 @@ namespace mirror {
 	public:
 		Type getType() const;
 		const char* getName() const;
+		const char* getCustomTypeName() const;
 		TypeID getTypeID() const;
 		size_t getSize() const;
 
@@ -215,6 +218,7 @@ namespace mirror {
 
 	// internal
 		void setName(const char* _name);
+		void setCustomTypeName(const char* _name);
 
 		virtual void shutdown();
 		virtual void init();
@@ -223,7 +227,8 @@ namespace mirror {
 		TypeDesc(Type _type, const char* _name, VirtualTypeWrapper* _virtualTypeWrapper);
 		virtual ~TypeDesc();
 
-		char* m_name;
+		char* m_name = nullptr;
+		char* m_customTypeName = nullptr;
 		Type m_type = Type_none;
 		VirtualTypeWrapper* m_virtualTypeWrapper = nullptr;
 	};
@@ -557,7 +562,6 @@ public:\
 		Initializer initializer;\
 	} // namespace __Mirror##_class
 
-
 //*****************************************************************************
 // Inline Implementations
 //*****************************************************************************
@@ -629,13 +633,31 @@ namespace mirror {
 	//-----------------------------------------------------------------------------
 
 	// --- TypeDescGetter
+	template <typename T>
+	struct CustomTypeDescFactory
+	{
+		static TypeDesc* Create()
+		{
+			return nullptr;
+		}
+	};
+
 	template <typename T, typename IsArray = void, typename IsPointer = void, typename IsEnum = void, typename IsFunction = void>
 	struct TypeDescGetter
 	{
 		static TypeDesc* Get()
 		{
 			TypeID typeID = GetTypeID<T>();
-			return GetTypeSet().findTypeByID(typeID);
+			TypeDesc* typeDesc = GetTypeSet().findTypeByID(typeID);
+			if (typeDesc == nullptr)
+			{
+				typeDesc = CustomTypeDescFactory<T>::Create();
+				if (typeDesc != nullptr)
+				{
+					GetTypeSet().addType(typeDesc);
+				}
+			}
+			return typeDesc;
 		}
 	};
 
@@ -1051,6 +1073,11 @@ namespace mirror {
 
 } // namespace mirror
 
+// Include to add custom types in. Just '#define MIRROR_EXTENSION_FILE "myfilename.h"' from your build system
+#ifdef MIRROR_EXTENSION_FILE
+#include MIRROR_EXTENSION_FILE
+#endif
+
 //*****************************************************************************
 // Implementation
 //*****************************************************************************
@@ -1118,6 +1145,7 @@ namespace mirror {
 			case Type_Pointer: return "Pointer";
 			case Type_FixedSizeArray: return "FixedSizeArray";
 			case Type_StaticFunction: return "StaticFunction";
+			case Type_Custom: return "Custom";
 			case Type_COUNT: return "COUNT";
 			default: assert(false);
 		}
@@ -1476,6 +1504,11 @@ namespace mirror {
 		return m_name;
 	}
 
+	const char* TypeDesc::getCustomTypeName() const
+	{
+		return m_customTypeName;
+	}
+
 	TypeID TypeDesc::getTypeID() const
 	{
 		return m_virtualTypeWrapper->getTypeID();
@@ -1613,6 +1646,12 @@ namespace mirror {
 	{
 		free(m_name);
 		ALLOCATE_AND_COPY_STRING(m_name, _name);
+	}
+
+	void TypeDesc::setCustomTypeName(const char* _name)
+	{
+		free(m_customTypeName);
+		ALLOCATE_AND_COPY_STRING(m_customTypeName, _name);
 	}
 
 	//-----------------------------------------------------------------------------
