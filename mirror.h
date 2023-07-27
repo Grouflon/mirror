@@ -223,9 +223,10 @@ namespace mirror {
 		virtual void shutdown();
 		virtual void init();
 
-		TypeDesc(Type _type, VirtualTypeWrapper* _virtualTypeWrapper);
-		TypeDesc(Type _type, const char* _name, VirtualTypeWrapper* _virtualTypeWrapper);
+		TypeDesc(Type _type);
+		TypeDesc(Type _type, const char* _name);
 		virtual ~TypeDesc();
+		template <typename T> void createVirtualTypeWrapper();
 
 		char* m_name = nullptr;
 		char* m_customTypeName = nullptr;
@@ -277,8 +278,8 @@ namespace mirror {
 	// internal
 		void addMember(ClassMember* _member);
 		void addParent(TypeID _parent);
-		Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const char* _metaDataString);
-		Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const MetaDataSet& _metaDataSet);
+		Class(const char* _name, const char* _metaDataString);
+		Class(const char* _name, const MetaDataSet& _metaDataSet);
 
 		virtual void shutdown() override;
 		virtual void init() override;
@@ -327,7 +328,7 @@ namespace mirror {
 
 	// internal
 		void addValue(EnumValue* _value);
-		Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeID _subType = UNDEFINED_TYPEID);
+		Enum(const char* _name, TypeID _subType = UNDEFINED_TYPEID);
 
 		std::vector<EnumValue*> m_values;
 		std::unordered_map<size_t, EnumValue*> m_valuesByNameHash;
@@ -356,7 +357,7 @@ namespace mirror {
 		TypeDesc* getSubType() const;
 
 	// internal
-		Pointer(TypeID _subType, VirtualTypeWrapper* _virtualTypeWrapper);
+		Pointer(TypeID _subType);
 
 		TypeID m_subType = UNDEFINED_TYPEID;
 	};
@@ -370,7 +371,7 @@ namespace mirror {
 		size_t getElementCount() const { return m_elementCount; }
 
 	// internal
-		FixedSizeArray(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper);
+		FixedSizeArray(TypeID _subType, size_t _elementCount);
 
 		TypeID m_subType = UNDEFINED_TYPEID;
 		size_t m_elementCount;
@@ -424,12 +425,10 @@ public:\
 	static ::mirror::ClassInitializer<_class> __MirrorInitializer;\
 	static ::mirror::Class* __MirrorCreateClass()\
 	{\
-		using classType = _class;\
-		\
 		const char* metaDataString = #__VA_ARGS__"";\
 		mirror::MetaDataSet metaDataSet(metaDataString);\
-		mirror::VirtualTypeWrapper* virtualTypeWrapper = new mirror::TVirtualTypeWrapper<classType>();\
-		::mirror::Class* clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
+		::mirror::Class* clss = new ::mirror::Class(#_class, metaDataSet);\
+		clss->createVirtualTypeWrapper<_class>();\
 		char fakePrototype[sizeof(_class)] = {};\
 		_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
 		(void)prototypePtr;\
@@ -477,7 +476,8 @@ public:\
 		}\
 		Initializer()\
 		{\
-			enm = new ::mirror::Enum(#_enumName, new ::mirror::TVirtualTypeWrapper<enumType>()); \
+			enm = new ::mirror::Enum(#_enumName); \
+			enm->createVirtualTypeWrapper<enumType>(); \
 			__MIRROR_ENUM_CONTENT
 
 #define MIRROR_ENUM_CLASS(_enumName)\
@@ -500,7 +500,8 @@ public:\
 				case 4: subType = ::mirror::TypeDescGetter<int32_t>::Get(); break; \
 				case 8: subType = ::mirror::TypeDescGetter<int64_t>::Get(); break; \
 			} \
-			enm = new ::mirror::Enum(#_enumName, new ::mirror::TVirtualTypeWrapper<enumType>(), subType->getTypeID()); \
+			enm = new ::mirror::Enum(#_enumName, subType->getTypeID()); \
+			enm->createVirtualTypeWrapper<enumType>(); \
 			__MIRROR_ENUM_CONTENT
 
 #define __MIRROR_ENUM_CONTENT(...)\
@@ -543,8 +544,8 @@ public:\
 		{\
 			const char* metaDataString = #__VA_ARGS__"";\
 			::mirror::MetaDataSet metaDataSet(metaDataString);\
-			::mirror::VirtualTypeWrapper* virtualTypeWrapper = new ::mirror::TVirtualTypeWrapper<_class>();\
-			clss = new ::mirror::Class(#_class, virtualTypeWrapper, metaDataSet);\
+			clss = new ::mirror::Class(#_class, metaDataSet);\
+			clss->createVirtualTypeWrapper<_class>(); \
 			char fakePrototype[sizeof(_class)] = {};\
 			_class* prototypePtr = reinterpret_cast<_class*>(fakePrototype);\
 			(void)prototypePtr;\
@@ -583,6 +584,19 @@ namespace mirror {
 	constexpr TypeID GetTypeID(T&)
 	{
 		return GetTypeID<T>();
+	}
+
+	//-----------------------------------------------------------------------------
+	// TypeDesc
+	//-----------------------------------------------------------------------------
+
+	template <typename T>
+	void TypeDesc::createVirtualTypeWrapper()
+	{
+		if (m_virtualTypeWrapper == nullptr)
+		{
+			m_virtualTypeWrapper = new TVirtualTypeWrapper<T>();
+		}
 	}
 
 	//-----------------------------------------------------------------------------
@@ -654,6 +668,7 @@ namespace mirror {
 				typeDesc = CustomTypeDescFactory<T>::Create();
 				if (typeDesc != nullptr)
 				{
+					typeDesc->createVirtualTypeWrapper<T>();
 					GetTypeSet().addType(typeDesc);
 				}
 			}
@@ -667,7 +682,8 @@ namespace mirror {
         FixedSizeArrayInitializer()
         {
 			using type = typename std::remove_extent<T>::type;
-			typeDesc = new FixedSizeArray(TypeDescGetter<type>::Get()->getTypeID(), std::extent<T>::value , new TVirtualTypeWrapper<T>());
+			typeDesc = new FixedSizeArray(TypeDescGetter<type>::Get()->getTypeID(), std::extent<T>::value);
+			typeDesc->createVirtualTypeWrapper<T>();
 			GetTypeSet().addType(typeDesc);
         }
         ~FixedSizeArrayInitializer()
@@ -694,7 +710,8 @@ namespace mirror {
         PointerInitializer()
         {
             using type = typename std::remove_pointer<T>::type;
-            typeDesc = new Pointer(TypeDescGetter<type>::Get()->getTypeID(), new TVirtualTypeWrapper<T>());
+            typeDesc = new Pointer(TypeDescGetter<type>::Get()->getTypeID());
+			typeDesc->createVirtualTypeWrapper<T>();
             GetTypeSet().addType(typeDesc);
         }
         ~PointerInitializer()
@@ -870,7 +887,8 @@ namespace mirror {
 	{
 		TypeDescInitializer(Type _type, const char* _name)
 		{
-			typeDesc = new TypeDesc(_type, _name, new TVirtualTypeWrapper<T>());
+			typeDesc = new TypeDesc(_type, _name);
+			typeDesc->createVirtualTypeWrapper<T>();
 			GetTypeSet().addType(typeDesc);
 		}
 		~TypeDescInitializer()
@@ -887,6 +905,7 @@ namespace mirror {
 		ClassInitializer()
 		{
 			clss = T::__MirrorCreateClass();
+			clss->createVirtualTypeWrapper<T>();
 			GetTypeSet().addType(clss);
 		}
 		~ClassInitializer()
@@ -921,8 +940,8 @@ namespace mirror {
     class MIRROR_API StaticFunction : public TypeDesc
     {
     public:
-        StaticFunction(VirtualTypeWrapper* _virtualTypeWrapper)
-                : TypeDesc(Type_StaticFunction, "StaticFunction", _virtualTypeWrapper)
+        StaticFunction()
+                : TypeDesc(Type_StaticFunction, "StaticFunction")
         {
         }
 
@@ -1048,8 +1067,9 @@ namespace mirror {
 			{
 				using function_pointer_t = typename std::add_pointer<T>::type;
 
-				StaticFunction* StaticFunction = new class StaticFunction(new TVirtualTypeWrapper<T, false>());
-				GetTypeSet().addType(StaticFunction);
+				StaticFunction* staticFunction = new class StaticFunction();
+				staticFunction->createVirtualTypeWrapper<T>();
+				GetTypeSet().addType(staticFunction);
 
 				// Return type
 				using ReturnType = typename FunctionTraits<function_pointer_t>::result;
@@ -1609,9 +1629,8 @@ namespace mirror {
 		return nullptr;
 	}
 
-	TypeDesc::TypeDesc(Type _type, const char* _name, VirtualTypeWrapper* _virtualTypeWrapper)
+	TypeDesc::TypeDesc(Type _type, const char* _name)
 		: m_type(_type)
-		, m_virtualTypeWrapper(_virtualTypeWrapper)
 	{
 		ALLOCATE_AND_COPY_STRING(m_name, _name);
 	}
@@ -1811,14 +1830,14 @@ namespace mirror {
 		}
 	}
 
-	Class::Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const char* _metaDataString)
-		: Class(_name, _virtualTypeWrapper, MetaDataSet(_metaDataString))
+	Class::Class(const char* _name, const char* _metaDataString)
+		: Class(_name, MetaDataSet(_metaDataString))
 	{
 
 	}
 
-	Class::Class(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, const MetaDataSet& _metaDataSet)
-		: TypeDesc(Type_Class, _name, _virtualTypeWrapper)
+	Class::Class(const char* _name, const MetaDataSet& _metaDataSet)
+		: TypeDesc(Type_Class, _name)
 		, m_metaDataSet(_metaDataSet)
 	{
 
@@ -1897,8 +1916,8 @@ namespace mirror {
 		m_valuesByNameHash.insert(std::make_pair(hash, _value));
 	}
 
-	Enum::Enum(const char* _name, VirtualTypeWrapper* _virtualTypeWrapper, TypeID _subType)
-		: TypeDesc(Type_Enum, _name, _virtualTypeWrapper)
+	Enum::Enum(const char* _name, TypeID _subType)
+		: TypeDesc(Type_Enum, _name)
 		, m_subType(_subType)
 	{
 
@@ -1931,8 +1950,8 @@ namespace mirror {
 		return GetTypeSet().findTypeByID(m_subType);
 	}
 
-	Pointer::Pointer(TypeID _subType, VirtualTypeWrapper* _virtualTypeWrapper)
-		: TypeDesc(Type_Pointer, "", _virtualTypeWrapper)
+	Pointer::Pointer(TypeID _subType)
+		: TypeDesc(Type_Pointer, "")
 		, m_subType(_subType)
 	{
 		setName((std::string("pointer_") + std::string(GetTypeSet().findTypeByID(_subType)->getName())).c_str());
@@ -1944,8 +1963,8 @@ namespace mirror {
 		return GetTypeSet().findTypeByID(m_subType);
 	}
 
-	FixedSizeArray::FixedSizeArray(TypeID _subType, size_t _elementCount, VirtualTypeWrapper* _virtualTypeWrapper)
-		: TypeDesc(Type_FixedSizeArray, "", _virtualTypeWrapper)
+	FixedSizeArray::FixedSizeArray(TypeID _subType, size_t _elementCount)
+		: TypeDesc(Type_FixedSizeArray, "")
 		, m_subType(_subType)
 		, m_elementCount(_elementCount)
 	{
