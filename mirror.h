@@ -57,7 +57,6 @@ namespace mirror {
 		Type_none = 0,
 
 		Type_void,
-
 		Type_bool,
 		Type_char,
 		Type_int8,
@@ -70,16 +69,11 @@ namespace mirror {
 		Type_uint64,
 		Type_float,
 		Type_double,
-
 		Type_Enum,
-
 		Type_Class,
-
 		Type_Pointer,
 		Type_FixedSizeArray,
-
 		Type_StaticFunction,
-
 		Type_Custom,
 
 		Type_COUNT,
@@ -302,7 +296,7 @@ namespace mirror {
 		TypeDesc* getType() const;
 
 		void* getInstanceMemberPointer(void* _classInstancePointer) const;
-		const MetaDataSet& GetMetaDataSet() const;
+		const MetaDataSet& getMetaDataSet() const;
 
 	// internal
 		ClassMember(const char* _name, size_t _offset, TypeID _type, const char* _metaDataString);
@@ -369,6 +363,7 @@ namespace mirror {
 
 		TypeDesc* getSubType() const;
 		size_t getElementCount() const { return m_elementCount; }
+		void* getDataAt(void* _basePtr, size_t _index) const;
 
 	// internal
 		FixedSizeArray(TypeID _subType, size_t _elementCount);
@@ -476,6 +471,7 @@ public:\
 		}\
 		Initializer()\
 		{\
+			using enumType = _enumName; \
 			enm = new ::mirror::Enum(#_enumName); \
 			enm->createVirtualTypeWrapper<enumType>(); \
 			__MIRROR_ENUM_CONTENT
@@ -1876,7 +1872,7 @@ namespace mirror {
 		return reinterpret_cast<uint8_t*>(_classInstancePointer) + m_offset;
 	}
 
-	const MetaDataSet& ClassMember::GetMetaDataSet() const
+	const MetaDataSet& ClassMember::getMetaDataSet() const
 	{
 		return m_metaDataSet;
 	}
@@ -1961,6 +1957,12 @@ namespace mirror {
 	TypeDesc* FixedSizeArray::getSubType() const
 	{
 		return GetTypeSet().findTypeByID(m_subType);
+	}
+
+	void* FixedSizeArray::getDataAt(void* _basePtr, size_t _index) const
+	{
+		assert(_index < m_elementCount);
+		return ((char*)_basePtr) + _index * getSubType()->getSize();
 	}
 
 	FixedSizeArray::FixedSizeArray(TypeID _subType, size_t _elementCount)
