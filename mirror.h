@@ -191,6 +191,7 @@ namespace mirror {
 		Type getType() const;
 		const char* getName() const;
 		const char* getCustomTypeName() const;
+		bool isCustomType(const char* _customTypeName) const;
 		TypeID getTypeID() const;
 		size_t getSize() const;
 
@@ -1523,6 +1524,11 @@ namespace mirror {
 	const char* TypeDesc::getCustomTypeName() const
 	{
 		return m_customTypeName;
+	}
+
+	bool TypeDesc::isCustomType(const char* _customTypeName) const
+	{
+		return m_type == Type_Custom && strcmp(_customTypeName, m_customTypeName) == 0;
 	}
 
 	TypeID TypeDesc::getTypeID() const
