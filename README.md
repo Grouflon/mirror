@@ -165,7 +165,7 @@ MIRROR_CLASS(MyClass, SerializeAs = Vector3) // You can add as many key=value me
 ```
 ### Custom types
 You can extend the reflection capabilities of mirror by creating your own custom types. This can be useful for reflecting your own templated types such as containers.
-To do this, you must create a file where you'll write your new types and append it to mirror.h by defining the MIRROR_EXTENSION_FILE define as the path to your file in your build system.
+To do this, you must create a file where you'll write your new types and append it to mirror.h by defining the `MIRROR_EXTENSION_FILE` define as the path to your file in your build system.
 #### Type declaration
 ```C++
 // Example for reflecting an Array type
