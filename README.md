@@ -15,7 +15,7 @@ In addition to that, you should select exactly one C++ source file that actually
 #define MIRROR_IMPLEMENTATION
 #include <mirror.h>
 ```
-You should then call `mirror::InitTypes()` as soon as you can in your main.cpp.
+You should then call `mirror::InitNewTypes()` as soon as you can in your main.cpp.
 
 ## Reflecting basic types
 ### Basic struct/class reflection

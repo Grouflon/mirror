@@ -119,7 +119,7 @@ namespace mirror {
 	//-----------------------------------------------------------------------------
 	// Global Functions
 	//-----------------------------------------------------------------------------
-	MIRROR_API void InitTypes();
+	MIRROR_API void InitNewTypes();
 
 	template <typename T> constexpr TypeID GetTypeID();
 	template <typename T> constexpr TypeID GetTypeID(T&);
@@ -197,15 +197,13 @@ namespace mirror {
 
 		const std::set<Type*>& getTypes() const;
 
-		void resolveTypes();
+		void initNewTypes();
 
 	//private:
 		std::set<Type*> m_types;
 		std::unordered_map<TypeID, Type*> m_typesByID;
 		std::unordered_map<TypeID, int> m_typesRegistrationCount;
 		std::unordered_map<uint32_t, Type*> m_typesByName;
-
-		bool m_resolved = false;
 	};
 
 	extern TypeSet* g_typeSetPtr;
@@ -256,6 +254,7 @@ namespace mirror {
 		char* m_customTypeName = nullptr;
 		TypeInfo m_typeInfo = TypeInfo_none;
 		VirtualTypeWrapper* m_virtualTypeWrapper = nullptr;
+		bool m_initialized = false;
 	};
 
 
@@ -1128,9 +1127,9 @@ namespace mirror {
 	//-----------------------------------------------------------------------------
 	// Global Functions
 	//-----------------------------------------------------------------------------
-	void InitTypes()
+	void InitNewTypes()
 	{
-		GetTypeSet().resolveTypes();
+		GetTypeSet().initNewTypes();
 	}
 
 	Type* FindTypeByName(const char* _name)
@@ -1389,15 +1388,6 @@ namespace mirror {
 
 		m_typesByID.insert(std::make_pair(_type->getTypeID(), _type));
 		m_types.emplace(_type);
-
-		if (m_resolved)
-		{
-			_type->init();
-
-			uint32_t nameHash = HashCString(_type->getName());
-			assert(m_typesByName.find(nameHash) == m_typesByName.end());
-			m_typesByName.insert(std::make_pair(nameHash, _type));
-		}
 	}
 
 	void TypeSet::addTypeName(Type* _type, const char* _name)
@@ -1430,7 +1420,7 @@ namespace mirror {
 			m_typesByID.erase(it);
 		}
 
-		if (m_resolved)
+		if (_type->m_initialized)
 		{
 			uint32_t nameHash = HashCString(_type->getName());
 			auto it = m_typesByName.find(nameHash);
@@ -1439,6 +1429,7 @@ namespace mirror {
 				m_typesByName.erase(it);
 			}
 			_type->shutdown();
+			_type->m_initialized = false;
 		}
 		
 		{
@@ -1456,33 +1447,21 @@ namespace mirror {
 		return m_types;
 	}
 
-	void TypeSet::resolveTypes()
+	void TypeSet::initNewTypes()
 	{
-		if (m_resolved)
-		{
-			for (Type* type : m_types)
-			{
-				uint32_t nameHash = HashCString(type->getName());
-				auto it = m_typesByName.find(nameHash);
-				if (it != m_typesByName.end())
-				{
-					m_typesByName.erase(it);
-				}
-
-				type->shutdown();
-			}
-		}
-
 		for (Type* type : m_types)
 		{
-			type->init();
+			if (!type->m_initialized)
+			{
+				type->init();
 
-			uint32_t nameHash = HashCString(type->getName());
-			assert(m_typesByName.find(nameHash) == m_typesByName.end());
-			m_typesByName.insert(std::make_pair(nameHash, type));
+				uint32_t nameHash = HashCString(type->getName());
+				assert(m_typesByName.find(nameHash) == m_typesByName.end());
+				m_typesByName.insert(std::make_pair(nameHash, type));
+
+				type->m_initialized = true;
+			}
 		}
-
-		m_resolved = true;
 	}
 
 	TypeSet* g_typeSetPtr = nullptr;
