@@ -9,13 +9,13 @@ mirror is a lightweight single header C++ reflection library that aims at provid
 
 ## How to use
 This library is loosely inspired from [single header stb libraries](https://github.com/nothings/stb).
-All the library is contained in the header file and the .h that you should include as any header when you want to use the library.
+All the library is contained in the `mirror.h` file and you just have to include that header when you want to use the library.
 In addition to that, you should select exactly one C++ source file that actually instantiates the code. This file should define the following macro before including the header
 ```C++
 #define MIRROR_IMPLEMENTATION
 #include <mirror.h>
 ```
-You should then call `mirror::InitNewTypes()` as soon as you can in your main.cpp.
+You should then call `mirror::InitNewTypes()` before you access any reflected type from your code. I recommend putting it early in the `main.cpp`.
 
 ## Reflecting basic types
 ### Basic struct/class reflection
@@ -165,7 +165,7 @@ MIRROR_CLASS(MyClass, SerializeAs = Vector3) // You can add as many key=value me
 ```
 ### Custom types
 You can extend the reflection capabilities of mirror by creating your own custom types. This can be useful for reflecting your own templated types such as containers.
-To do this, you must create a file where you'll write your new types and append it to mirror.h by defining the MIRROR_EXTENSION_FILE define as the path to your file in your build system.
+To do this, you must create a file where you'll write your new types and append it to mirror.h by defining the `MIRROR_EXTENSION_FILE` define as the path to your file in your build system.
 #### Type declaration
 ```C++
 // Example for reflecting an Array type
