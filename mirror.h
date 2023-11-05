@@ -176,6 +176,7 @@ namespace mirror {
 	// internal
 		MetaDataSet(const char* _metaDataString);
 		MetaDataSet(const MetaDataSet& _other);
+		MetaDataSet& operator=(const MetaDataSet& _other) = default;
 		std::unordered_map<uint32_t, MetaData> m_metaData;
 	};
 
@@ -1057,6 +1058,7 @@ namespace mirror {
 #ifdef MIRROR_IMPLEMENTATION
 
 #include <cstring>
+#include <string>
 
 namespace mirror {
 
